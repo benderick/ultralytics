@@ -109,11 +109,15 @@ def _log_plots(plots, step):
 
 def on_pretrain_routine_start(trainer):
     """Initiate and start project if module is present."""
+    project = str(trainer.args.project)
+    if "/" in project:
+        project = project.split("/")[-1]
     if not wb.run:
         wb.init(
-            project=str(trainer.args.project).replace("/", "-") if trainer.args.project else "Ultralytics",
+            project=project if trainer.args.project else "Ultralytics",
             name=str(trainer.args.name).replace("/", "-"),
             config=vars(trainer.args),
+            dir=trainer.save_dir.parent
         )
 
 
