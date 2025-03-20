@@ -109,13 +109,24 @@ def _log_plots(plots, step):
 
 def on_pretrain_routine_start(trainer):
     """Initiate and start project if module is present."""
+    import datetime
+
+    # 获取当前时间
+    now = datetime.datetime.now()
+    # 将时间格式化为指定格式
+    formatted_time = now.strftime("%y%m%d_%H%M")
+    
     project = str(trainer.args.project)
     if "/" in project:
         project = project.split("/")[-1]
+        
+    name = str(trainer.args.name).replace("/", "-")
+    name = f"{name}-{formatted_time}"
+    
     if not wb.run:
         wb.init(
             project=project if trainer.args.project else "Ultralytics",
-            name=str(trainer.args.name).replace("/", "-"),
+            name=name,
             config=vars(trainer.args),
             dir=trainer.save_dir.parent
         )
