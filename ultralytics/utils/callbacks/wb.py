@@ -130,6 +130,7 @@ def on_pretrain_routine_start(trainer):
             config=vars(trainer.args),
             dir=trainer.save_dir.parent
         )
+        wb.run.notes = str(trainer.args.notes)
 
 
 def on_fit_epoch_end(trainer):

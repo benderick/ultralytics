@@ -889,7 +889,10 @@ def colorstr(*input):
         "bold": "\033[1m",
         "underline": "\033[4m",
     }
-    return "".join(colors[x] for x in args) + f"{string}" + colors["end"]
+    result = "".join(colors[x] for x in args) + f"{string}" + colors["end"]
+    origin = remove_colorstr(result)
+    new_result = "🔔 " + origin
+    return new_result
 
 
 def remove_colorstr(input_string):
