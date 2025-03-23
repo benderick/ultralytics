@@ -120,6 +120,10 @@ extra = [
     "albumentations>=1.4.6", # training augmentations
     "pycocotools>=2.0.7", # COCO mAP
 ]
+my-extra = [
+    "albumentations>=1.4.6", # training augmentations
+    "pycocotools>=2.0.7", # COCO mAP
+]
 
 [project.urls]
 "Homepage" = "https://ultralytics.com"
@@ -182,3 +186,15 @@ in-place = true
 [tool.codespell]
 ignore-words-list = "crate,nd,ned,strack,dota,ane,segway,fo,gool,winn,commend,bloc,nam,afterall"
 skip = '*.pt,*.pth,*.torchscript,*.onnx,*.tflite,*.pb,*.bin,*.param,*.mlmodel,*.engine,*.npy,*.data*,*.csv,*pnnx*,*venv*,*translat*,__pycache__*,*.ico,*.jpg,*.png,*.mp4,*.mov,/runs,/.git,./docs/??/*.md,./docs/mkdocs_??.yml'
+
+[tool.uv.sources]
+torch = [
+    {index = "pytorch-cu118"}
+]
+torchvision = [
+    {index = "pytorch-cu118"}
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
