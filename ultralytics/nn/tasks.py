@@ -1,5 +1,6 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
+from .workpieces import *
 import contextlib
 import pickle
 import re
@@ -946,63 +947,31 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
         LOGGER.info(f"\n{'':>3}{'from':>20}{'n':>3}{'params':>10}  {'module':<45}{'arguments':<30}")
     ch = [ch]
     layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
-    base_modules = frozenset(
-        {
-            Classify,
-            Conv,
-            ConvTranspose,
-            GhostConv,
-            Bottleneck,
-            GhostBottleneck,
-            SPP,
-            SPPF,
-            C2fPSA,
-            C2PSA,
-            DWConv,
-            Focus,
-            BottleneckCSP,
-            C1,
-            C2,
-            C2f,
-            C3k2,
-            RepNCSPELAN4,
-            ELAN1,
-            ADown,
-            AConv,
-            SPPELAN,
-            C2fAttn,
-            C3,
-            C3TR,
-            C3Ghost,
-            torch.nn.ConvTranspose2d,
-            DWConvTranspose2d,
-            C3x,
-            RepC3,
-            PSA,
-            SCDown,
-            C2fCIB,
-            A2C2f,
-        }
-    )
-    repeat_modules = frozenset(  # modules with 'repeat' arguments
-        {
-            BottleneckCSP,
-            C1,
-            C2,
-            C2f,
-            C3k2,
-            C2fAttn,
-            C3,
-            C3TR,
-            C3Ghost,
-            C3x,
-            RepC3,
-            C2fPSA,
-            C2fCIB,
-            C2PSA,
-            A2C2f,
-        }
-    )
+
+    # 加载components配置
+    components_path = Path(__file__).parent / 'components.yaml'
+    components = yaml_load(components_path)
+    
+    # 构建base_modules集合
+    base_modules = frozenset({
+        getattr(torch.nn, name[3:])
+            if "nn." in name
+            else getattr(__import__("torchvision").ops, name[16:])
+            if "torchvision.ops." in name
+            else globals()[name]
+        for name in components['base_modules']
+    })
+    
+    # 构建repeat_modules集合 
+    repeat_modules = frozenset({
+        getattr(torch.nn, name[3:])
+            if "nn." in name
+            else getattr(__import__("torchvision").ops, name[16:])
+            if "torchvision.ops." in name
+            else globals()[name]
+        for name in components['repeat_modules']
+    })
+
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
         m = (
             getattr(torch.nn, m[3:])
