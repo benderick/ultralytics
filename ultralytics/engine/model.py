@@ -81,7 +81,7 @@ class Model(torch.nn.Module):
 
     def __init__(
         self,
-        model: Union[str, Path] = "yolo11n.pt",
+        model: Union[str, Path, dict] = "yolo11n.pt",
         task: str = None,
         verbose: bool = False,
     ) -> None:
@@ -123,29 +123,18 @@ class Model(torch.nn.Module):
         self.session = None  # HUB session
         self.task = task  # task type
         self.model_name = None  # model name
-        model = str(model).strip()
-
-        # Check if Ultralytics HUB model from https://hub.ultralytics.com
-        if self.is_hub_model(model):
-            # Fetch model from HUB
-            checks.check_requirements("hub-sdk>=0.0.12")
-            session = HUBTrainingSession.create_session(model)
-            model = session.model_file
-            if session.train_args:  # training sent from HUB
-                self.session = session
-
-        # Check if Triton Server model
-        elif self.is_triton_model(model):
-            self.model_name = self.model = model
-            self.overrides["task"] = task or "detect"  # set `task=detect` if not explicitly set
-            return
-
-        # Load or create new YOLO model
+        
         __import__("os").environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"  # to avoid deterministic warnings
-        if Path(model).suffix in {".yaml", ".yml"}:
-            self._new(model, task=task, verbose=verbose)
+        
+        if not isinstance(model,  dict):
+            model = str(model).strip()
+            # Load or create new YOLO model
+            if Path(model).suffix in {".yaml", ".yml"}:
+                self._new(model, task=task, verbose=verbose)
+            else:
+                self._load(model, task=task)
         else:
-            self._load(model, task=task)
+            self._new_from_dict(model, task=task, verbose=verbose)
 
         # Delete super().training for accessing self.model.training
         del self.training
@@ -262,6 +251,43 @@ class Model(torch.nn.Module):
         self.model.args = {**DEFAULT_CFG_DICT, **self.overrides}  # combine default and model args (prefer model args)
         self.model.task = self.task
         self.model_name = cfg
+    
+    def _new_from_dict(self, cfg: dict, task=None, model=None, verbose=False) -> None:
+        """
+        Adapted from _new to allow for loading from a dictionary instead of a file.
+        
+        Initializes a new model and infers the task type from the model definitions.
+
+        This method creates a new model instance based on the provided configuration file. It loads the model
+        configuration, infers the task type if not specified, and initializes the model using the appropriate
+        class from the task map.
+
+        Args:
+            cfg (dict): Dict to the model configuration transferred from YAML file.
+            task (str | None): The specific task for the model. If None, it will be inferred from the config.
+            model (torch.nn.Module | None): A custom model instance. If provided, it will be used instead of creating
+                a new one.
+            verbose (bool): If True, displays model information during loading.
+
+        Raises:
+            ValueError: If the configuration file is invalid or the task cannot be inferred.
+            ImportError: If the required dependencies for the specified task are not installed.
+
+        Examples:
+            >>> model = Model()
+            >>> model._new_from_dict(model_dict:dict, task="detect", verbose=True)
+        """
+        cfg_dict = cfg
+        self.cfg = cfg["yaml_file"]
+        self.task = task or guess_model_task(cfg_dict)
+        self.model = (model or self._smart_load("model"))(cfg_dict, verbose=verbose and RANK == -1)  # build model
+        self.overrides["model"] = self.cfg
+        self.overrides["task"] = self.task
+
+        # Below added to allow export from YAMLs
+        self.model.args = {**DEFAULT_CFG_DICT, **self.overrides}  # combine default and model args (prefer model args)
+        self.model.task = self.task
+        self.model_name = self.cfg
 
     def _load(self, weights: str, task=None) -> None:
         """

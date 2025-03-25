@@ -605,10 +605,10 @@ class WorldModel(DetectionModel):
     def set_classes(self, text, batch=80, cache_clip_model=True):
         """Set classes in advance so that model could do offline-inference without clip model."""
         try:
-            import clip
+            import clip # type: ignore
         except ImportError:
             check_requirements("git+https://github.com/ultralytics/CLIP.git")
-            import clip
+            import clip # type: ignore
 
         if (
             not getattr(self, "clip_model", None) and cache_clip_model

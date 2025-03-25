@@ -13,14 +13,17 @@ class YOLO(Model):
 
     def __init__(self, model="yolo11n.pt", task=None, verbose=False):
         """Initialize YOLO model, switching to YOLOWorld if model filename contains '-world'."""
-        path = Path(model)
-        if "-world" in path.stem and path.suffix in {".pt", ".yaml", ".yml"}:  # if YOLOWorld PyTorch model
-            new_instance = YOLOWorld(path, verbose=verbose)
-            self.__class__ = type(new_instance)
-            self.__dict__ = new_instance.__dict__
-        else:
-            # Continue with default YOLO initialization
+        if isinstance(model, dict):
             super().__init__(model=model, task=task, verbose=verbose)
+        else:
+            path = Path(model)
+            if "-world" in path.stem and path.suffix in {".pt", ".yaml", ".yml"}:  # if YOLOWorld PyTorch model
+                new_instance = YOLOWorld(path, verbose=verbose)
+                self.__class__ = type(new_instance)
+                self.__dict__ = new_instance.__dict__
+            else:
+                # Continue with default YOLO initialization
+                super().__init__(model=model, task=task, verbose=verbose)
 
     @property
     def task_map(self):
