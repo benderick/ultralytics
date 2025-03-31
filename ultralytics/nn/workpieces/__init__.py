@@ -57,22 +57,30 @@ except IOError as e:
         'repeat_modules': []
     }
 
-# 更新 base_modules 和 repeat_modules
+# 获取yaml中的 base_modules 和 repeat_modules
 current_base_modules = yaml_data.get('base_modules', [])
 current_repeat_modules = yaml_data.get('repeat_modules', [])
 
-# base_modules 包含所有类（去重）
-updated_base_modules = list(set(current_base_modules + classes_with_n + classes_without_n))
-# repeat_modules 只包含带 n 的类（去重）
-updated_repeat_modules = list(set(current_repeat_modules + classes_with_n))
+def is_subset(list1, list2):
+    return set(list1).issubset(set(list2))
 
-yaml_data['base_modules'] = updated_base_modules
-yaml_data['repeat_modules'] = updated_repeat_modules
+# 检查是否需要更新yaml
+if is_subset(classes_with_n, current_base_modules) and is_subset(classes_without_n, current_base_modules) and is_subset(classes_with_n, current_repeat_modules):
+    pass
+else:
+    # base_modules 包含所有类（去重）
+    updated_base_modules = list(set(current_base_modules + classes_with_n + classes_without_n))
+    # repeat_modules 只包含带 n 的类（去重）
+    updated_repeat_modules = list(set(current_repeat_modules + classes_with_n))
 
-# 写入更新后的 YAML 文件
-try:
-    with open(yaml_file, 'w') as f:
-        yaml.dump(yaml_data, f, default_flow_style=False)
-    print(f"🔔 WORKPIECES successfully updated components.yaml")
-except IOError as e:
-    print(f"WORKPIECES Error writing to {yaml_file}: {e}")
+
+    yaml_data['base_modules'] = updated_base_modules
+    yaml_data['repeat_modules'] = updated_repeat_modules
+
+    # 写入更新后的 YAML 文件
+    try:
+        with open(yaml_file, 'w') as f:
+            yaml.dump(yaml_data, f, default_flow_style=False)
+        print(f"🔔 WORKPIECES successfully updated components.yaml")
+    except IOError as e:
+        print(f"WORKPIECES Error writing to {yaml_file}: {e}")
