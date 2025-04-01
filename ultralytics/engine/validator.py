@@ -213,10 +213,12 @@ class BaseValidator:
                 )
             )
             if self.args.save_json and self.jdict:
-                with open(str(self.save_dir / "predictions.json"), "w", encoding="utf-8") as f:
-                    LOGGER.info(f"Saving {f.name}...")
+                LOGGER.info(f"{colorstr('bold', 'Using pycocotools:')}")
+                with open(str(self.save_dir / "val_pred_coco.json"), "w", encoding="utf-8") as f:
+                    LOGGER.info(f"Saving val_pred_coco.json")
                     json.dump(self.jdict, f)  # flatten and save
-                stats = self.eval_json(stats)  # update stats
+                # stats = self.eval_json(stats)  # update stats
+                stats = self.eval_use_pycocotools(stats)  # update stats
             if self.args.plots or self.args.save_json:
                 LOGGER.info(f"Results saved to {colorstr('bold', self.save_dir)}")
             return stats
@@ -340,4 +342,8 @@ class BaseValidator:
 
     def eval_json(self, stats):
         """Evaluate and return JSON format of prediction statistics."""
+        pass
+    
+    def eval_use_pycocotools(self, stats):
+        """Evaluate and return COCO format of prediction statistics."""
         pass
