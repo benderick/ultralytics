@@ -24,6 +24,7 @@ Usage - formats:
 """
 
 import json
+import logging
 import time
 from pathlib import Path
 
@@ -122,6 +123,12 @@ class BaseValidator:
             self.args.plots &= trainer.stopper.possible_stop or (trainer.epoch == trainer.epochs - 1)
             model.eval()
         else:
+            # 输出到文件
+            log_file = self.save_dir / "log.log"
+            file_handler = logging.FileHandler(str(log_file), mode='a+', encoding='utf-8')
+            file_handler.setFormatter(logging.Formatter("%(message)s"))
+            file_handler.setLevel(logging.INFO)
+            LOGGER.addHandler(file_handler)
             if str(self.args.model).endswith(".yaml") and model is None:
                 LOGGER.warning("WARNING ⚠️ validating an untrained model YAML will result in 0 mAP.")
             callbacks.add_integration_callbacks(self)

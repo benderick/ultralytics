@@ -341,13 +341,9 @@ class DetectionValidator(BaseValidator):
         """使用pycocotools对具有coco格式的标注进行评估"""
         if self.args.save_json and len(self.jdict):
             pred_json = self.save_dir / "val_pred_coco.json"  # predictions
-            anno_json = (
-                self.data["path"]
-                / "annotations"
-                / "val_coco.json"
-            )  # annotations
+            anno_json = (self.data["path"] / "annotations" / "val_coco.json")  # annotations
             pkg = "pycocotools" # if self.is_coco else "lvis"
-            LOGGER.info(f"Evaluating {pkg} mAP using {pred_json} and {anno_json}...")
+            LOGGER.info(f"Evaluating {pkg} mAP using {pred_json} and {anno_json}")
             try:  # https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocoEvalDemo.ipynb
                 for x in pred_json, anno_json:
                     assert x.is_file(), f"{x} file not found"
@@ -363,6 +359,9 @@ class DetectionValidator(BaseValidator):
                 val.accumulate()
                 val.summarize()
                 
+                table = self.format_coco_results(val.stats)
+                LOGGER.info("\nCOCO评估结果:\n" + table)
+                
                 # update mAP50-95 and mAP50
                 stats[self.metrics.keys[-1]], stats[self.metrics.keys[-2]] = (
                     val.stats[:2] if True else [val.results["AP50"], val.results["AP"]]
@@ -370,3 +369,18 @@ class DetectionValidator(BaseValidator):
             except Exception as e:
                 LOGGER.warning(f"{pkg} unable to run: {e}")
         return stats
+    
+    def format_coco_results(self, stats):
+        """将COCO评估结果格式化为简单的对齐表格并保存"""
+        # 简化的指标名称
+        headers_AP = ['AP', 'AP50', 'AP75', 'APs', 'APm', 'APl', ]
+        headers_AR = ['AR1', 'AR10', 'AR100', 'ARs', 'ARm', 'ARl']
+        values_AP = [f"{x:.3f}" for x in stats[:6]]
+        values_AR = [f"{x:.3f}" for x in stats[6:]]
+        
+        result = ' '.join(f"{h:>8}" for h in headers_AP) + '\n'  
+        result += ' '.join(f"{v:>8}" for v in values_AP) + '\n\n'
+        result += ' '.join(f"{h:>8}" for h in headers_AR) + '\n'  
+        result += ' '.join(f"{v:>8}" for v in values_AR) + '\n'       
+        return result
+    
