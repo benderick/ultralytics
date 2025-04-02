@@ -23,6 +23,7 @@ from urllib.parse import unquote
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from omegaconf import DictConfig, OmegaConf
 import torch
 import tqdm
 import yaml
@@ -822,6 +823,8 @@ def get_user_config_dir(sub_dir="Ultralytics"):
 
     return path
 
+def oc_to_dict(omf: DictConfig) -> dict:
+    return OmegaConf.to_container(omf, resolve=True)
 
 # Define constants (required below)
 DEVICE_MODEL = read_device_model()  # is_jetson() and is_raspberrypi() depend on this constant

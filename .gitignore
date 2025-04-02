@@ -173,3 +173,6 @@ pnnx*
 
 # calibration image
 calibration_*.npy
+
+logs/*
+!logs/.gitkeep

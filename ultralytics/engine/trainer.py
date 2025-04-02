@@ -149,6 +149,9 @@ class BaseTrainer:
 
         # HUB
         self.hub_session = None
+        
+        # 低指标结束训练
+        self.need_to_finish = False
 
         # Callbacks
         self.callbacks = _callbacks or callbacks.get_default_callbacks()
@@ -435,7 +438,6 @@ class BaseTrainer:
                 self.stop |= self.stopper(epoch + 1, self.fitness) or final_epoch
                 if self.args.time:
                     self.stop |= (time.time() - self.train_time_start) > (self.args.time * 3600)
-
                 # Save model
                 if self.args.save or final_epoch:
                     self.save_model()
@@ -452,6 +454,8 @@ class BaseTrainer:
                 self.scheduler.last_epoch = self.epoch  # do not move
                 self.stop |= epoch >= self.epochs  # stop if exceeded epochs
             self.run_callbacks("on_fit_epoch_end")
+            # 低指标中断
+            self.stop |= self.need_to_finish
             if self._get_memory(fraction=True) > 0.9:
                 self._clear_memory()  # clear if memory utilization > 90%
 
@@ -698,7 +702,7 @@ class BaseTrainer:
                     self.validator.args.plots = self.args.plots
                     self.metrics = self.validator(model=f)
                     self.metrics.pop("fitness", None)
-                    self.run_callbacks("on_fit_epoch_end")
+                    # self.run_callbacks("on_fit_epoch_end")
 
     def check_resume(self, overrides):
         """Check if resume checkpoint exists and update arguments accordingly."""
