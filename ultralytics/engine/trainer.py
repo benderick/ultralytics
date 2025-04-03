@@ -54,7 +54,7 @@ from ultralytics.utils.torch_utils import (
     torch_distributed_zero_first,
     unset_deterministic,
 )
-
+from omegaconf import DictConfig
 
 class BaseTrainer:
     """
@@ -106,6 +106,8 @@ class BaseTrainer:
         self.metrics = None
         self.plots = {}
         init_seeds(self.args.seed + 1 + RANK, deterministic=self.args.deterministic)
+        
+        self.logger = DictConfig(eval(self.args.get("logger", "None")))
 
         # Dirs
         self.save_dir = get_save_dir(self.args)
@@ -588,7 +590,7 @@ class BaseTrainer:
         if isinstance(self.model, torch.nn.Module):  # if model is loaded beforehand. No setup needed
             return
 
-        cfg, weights = self.model, None
+        cfg, weights = eval(self.args.get("model_dict_str", "None")) if self.args.get("model_dict_str", "None") else self.model, None
         ckpt = None
         if str(self.model).endswith(".pt"):
             weights, ckpt = attempt_load_one_weight(self.model)

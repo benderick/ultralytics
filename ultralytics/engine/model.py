@@ -278,16 +278,17 @@ class Model(torch.nn.Module):
             >>> model._new_from_dict(model_dict:dict, task="detect", verbose=True)
         """
         cfg_dict = cfg
-        self.cfg = cfg["yaml_file"]
+        self.cfg = cfg["name"] + "-" + cfg["scale"]
         self.task = task or guess_model_task(cfg_dict)
         self.model = (model or self._smart_load("model"))(cfg_dict, verbose=verbose and RANK == -1)  # build model
         self.overrides["model"] = self.cfg
         self.overrides["task"] = self.task
+        self.model_dict_str = str(cfg)
 
         # Below added to allow export from YAMLs
         self.model.args = {**DEFAULT_CFG_DICT, **self.overrides}  # combine default and model args (prefer model args)
         self.model.task = self.task
-        self.model_name = self.cfg
+        self.model_name = cfg["name"]
 
     def _load(self, weights: str, task=None) -> None:
         """
@@ -770,7 +771,6 @@ class Model(torch.nn.Module):
     def train(
         self,
         trainer=None,
-        logger=None,
         **kwargs: Any,
     ):
         """
@@ -824,12 +824,13 @@ class Model(torch.nn.Module):
             "model": self.overrides["model"],
             "task": self.task,
         }  # method defaults
-        args = {**overrides, **custom, **kwargs, "mode": "train"}  # highest priority args on the right
+        args = {**overrides, **custom, **kwargs, "mode": "train", "model_dict_str": self.model_dict_str}  # highest priority args on the right
         if args.get("resume"):
             args["resume"] = self.ckpt_path
 
         self.trainer = (trainer or self._smart_load("trainer"))(overrides=args, _callbacks=self.callbacks)
-        self.trainer.logger = logger
+        # if RANK in {-1, 0}:
+        #     self.trainer.logger = logger
         if not args.get("resume"):  # manually set model only if not resuming
             self.trainer.model = self.trainer.get_model(weights=self.model if self.ckpt else None, cfg=self.model.yaml)
             self.model = self.trainer.model

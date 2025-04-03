@@ -148,7 +148,7 @@ def on_fit_epoch_end(trainer):
         wb.run.log(model_info_for_loggers(trainer), step=trainer.epoch + 1)
     
     # 记录模型的mAP和mAP50到数据库
-    epoche_list = [0, 1, 50, 100, 150]
+    epoche_list = [50, 100, 150, 200, 250]
     if trainer.epoch in epoche_list:
         run = Run.get(Run.id == wb.run.id)
         run.map = eval(run.map) + [trainer.metrics["metrics/mAP50-95(B)"]]

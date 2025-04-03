@@ -9,6 +9,7 @@ class Run(peewee.Model):
     project = peewee.CharField(null=True)
     name = peewee.CharField(null=True)
     base_model = peewee.CharField(null=True)
+    scale = peewee.CharField(null=True)
     data = peewee.CharField(null=True)
     group = peewee.CharField(null=True)
     notes = peewee.CharField(null=True)
