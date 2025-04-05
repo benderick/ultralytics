@@ -125,13 +125,14 @@ def on_pretrain_routine_start(trainer):
     name = f"{name}-{formatted_time}"
     
     if not wb.run:
+        logger_info = trainer.logger
         wb.init(
             project=project if trainer.args.project else "Ultralytics",
+            group=logger_info.group,
             name=name,
             config=vars(trainer.args),
             dir=trainer.save_dir.parent
         )
-        logger_info = trainer.logger
         wb.run.notes = str(logger_info.notes)
         wb.run.tags = logger_info.tags
         run = Run.create(id=wb.run.id, location=str(trainer.save_dir.parent),**oc_to_dict(logger_info))
