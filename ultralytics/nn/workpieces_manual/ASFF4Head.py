@@ -5,7 +5,7 @@ from ultralytics.utils.tal import dist2bbox, make_anchors
 import math
 import torch.nn.functional as F
 
-__all__ = ['FASFFHead']
+__all__ = ['ASFF4Head']
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
     """Pad to 'same' shape outputs."""
@@ -57,10 +57,10 @@ class DFL(nn.Module):
         # return self.conv(x.view(b, self.c1, 4, a).softmax(1)).view(b, 4, a)
 
 
-class FASFF(nn.Module):
+class ASFF4(nn.Module):
     def __init__(self, level, ch, multiplier=1, rfb=False, vis=False):
 
-        super(FASFF, self).__init__()
+        super(ASFF4, self).__init__()
 
         self.level = level
         self.dim = [int(ch[3] * multiplier), int(ch[2] * multiplier), int(ch[1] * multiplier),
@@ -183,7 +183,7 @@ class DWConv(Conv):
 
 
 
-class FASFFHead(nn.Module):
+class ASFF4Head(nn.Module):
     """YOLOv8 Detect head for detection models. CSDNSnu77"""
 
     dynamic = False  # force grid reconstruction
@@ -216,10 +216,10 @@ class FASFFHead(nn.Module):
         )
 
         self.dfl = DFL(self.reg_max) if self.reg_max > 1 else nn.Identity()
-        self.l0_fusion = FASFF(level=0, ch=ch, multiplier=multiplier, rfb=rfb)
-        self.l1_fusion = FASFF(level=1, ch=ch, multiplier=multiplier, rfb=rfb)
-        self.l2_fusion = FASFF(level=2, ch=ch, multiplier=multiplier, rfb=rfb)
-        self.l3_fusion = FASFF(level=3, ch=ch, multiplier=multiplier, rfb=rfb)
+        self.l0_fusion = ASFF4(level=0, ch=ch, multiplier=multiplier, rfb=rfb)
+        self.l1_fusion = ASFF4(level=1, ch=ch, multiplier=multiplier, rfb=rfb)
+        self.l2_fusion = ASFF4(level=2, ch=ch, multiplier=multiplier, rfb=rfb)
+        self.l3_fusion = ASFF4(level=3, ch=ch, multiplier=multiplier, rfb=rfb)
 
         if self.end2end:
             self.one2one_cv2 = copy.deepcopy(self.cv2)
@@ -335,19 +335,19 @@ class FASFFHead(nn.Module):
         return torch.cat([boxes[i, index // nc], scores[..., None], (index % nc)[..., None].float()], dim=-1)
 
 
-# if __name__ == "__main__":
-#     # Generating Sample image
-#     image1 = (1, 64, 32, 32)
-#     image2 = (1, 128, 16, 16)
-#     image3 = (1, 256, 8, 8)
-#
-#     image1 = torch.rand(image1)
-#     image2 = torch.rand(image2)
-#     image3 = torch.rand(image3)
-#     image = [image1, image2, image3]
-#     channel = (64, 128, 256)
-#     # Model
-#     mobilenet_v1 = FASFFHead(nc=80, ch=channel)
-#
-#     out = mobilenet_v1(image)
-#     print(out)
+if __name__ == "__main__":
+    # Generating Sample image
+    image1 = (1, 64, 32, 32)
+    image2 = (1, 128, 16, 16)
+    image3 = (1, 256, 8, 8)
+
+    image1 = torch.rand(image1)
+    image2 = torch.rand(image2)
+    image3 = torch.rand(image3)
+    image = [image1, image2, image3]
+    channel = (64, 128, 256)
+    # Model
+    mobilenet_v1 = ASFF4Head(nc=80, ch=channel)
+
+    out = mobilenet_v1(image)
+    print(out)

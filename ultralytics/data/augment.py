@@ -1852,8 +1852,107 @@ class Albumentations:
                 A.CLAHE(p=0.01),
                 A.RandomBrightnessContrast(p=0.0),
                 A.RandomGamma(p=0.0),
-                A.ImageCompression(quality_range=(75, 100), p=0.0),
+                # A.ImageCompression(quality_range=(75, 100), p=0.0),
             ]
+            
+            # T = [
+            #     A.Blur(p=0.01),
+            #     A.MedianBlur(p=0.01),
+            #     A.ToGray(p=0.01),
+            #     A.CLAHE(p=0.01),
+            #     A.RandomBrightnessContrast(p=0.01),
+            #     A.RandomGamma(p=0.01),
+            #     # 3. 图像质量变化 - 模拟无人机相机特性
+            #     A.OneOf([
+            #         # 模拟运动模糊 - 无人机高速移动时常见
+            #         A.MotionBlur(blur_limit=(3, 5), p=0.01),
+            #         # 模拟噪点 - 远距离拍摄时信噪比下降
+            #         A.GaussNoise(p=0.2),
+            #         # 锐化 - 增强边缘细节
+            #         A.Sharpen(alpha=(0.1, 0.3), lightness=(0.5, 1.0), p=0.2)
+            #     ], p=0.4),
+            #     # 通道混洗 - 增强模型对颜色不变特征的学习
+            #     A.ChannelShuffle(p=0.01),
+                
+            # ]
+            
+            # T = [
+            #     # 模拟镜头模糊
+            #     A.OneOf([
+            #         A.Blur(blur_limit=(3, 5), p=0.1),
+            #         A.MedianBlur(blur_limit=3, p=0.1),
+            #         A.MotionBlur(blur_limit=5, p=0.05),
+            #     ], p=0.2),
+
+            #     # 图像对比增强
+            #     A.CLAHE(clip_limit=(1.0, 4.0), tile_grid_size=(8, 8), p=0.1),
+            #     A.RandomBrightnessContrast(p=0.2),
+
+            #     # 灰度图模拟不同照明条件
+            #     A.ToGray(p=0.05),
+
+            #     # 轻微仿射变换，避免目标移出
+            #     A.Affine(
+            #         scale=(0.9, 1.1),
+            #         translate_percent=(0.0, 0.05),
+            #         rotate=(-5, 5),
+            #         shear=(-1, 1),
+            #         p=0.3
+            #     ),
+
+            #     A.OneOf([
+            #         A.CropAndPad(percent=(-0.1, 0.1), border_mode=0, p=0.3),
+            #         A.RandomSizedBBoxSafeCrop(height=640, width=640, erosion_rate=0.2, p=0.2),
+            #     ], p=0.3),
+
+            #     # 图像翻转
+            #     A.HorizontalFlip(p=0.5),
+            # ]
+            
+            # 构建增强管道
+            # T = [
+            #     # 1. 安全空间变换 - 保护小目标
+                
+            #     # 透视变换 - 模拟无人机不同角度俯视
+            #     A.Perspective(scale=(0.01, 0.05), p=0.2),
+                
+            #     # 2. 天气和大气条件模拟
+            #     A.OneOf([
+
+            #         # 亮度和对比度变化 - 模拟不同时间和光照条件
+            #         A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.3),
+            #         # 日光 - 模拟强光照射
+            #         A.RandomSunFlare(flare_roi=(0, 0, 1, 1),  
+            #                         src_radius=20, src_color=(255, 255, 255), p=0.1)
+            #     ], p=0.3),
+                
+            #     # 3. 图像质量变化 - 模拟无人机相机特性
+            #     A.OneOf([
+            #         # 模拟运动模糊 - 无人机高速移动时常见
+            #         A.MotionBlur(blur_limit=(3, 5), p=0.2),
+            #         # 模拟噪点 - 远距离拍摄时信噪比下降
+            #         A.GaussNoise(p=0.2),
+            #         # 锐化 - 增强边缘细节
+            #         A.Sharpen(alpha=(0.1, 0.3), lightness=(0.5, 1.0), p=0.2)
+            #     ], p=0.3),
+                
+            #     # 4. 色彩调整 - 适应不同场景
+            #     A.OneOf([
+            #         # CLAHE - 增强低对比度区域
+            #         A.CLAHE(clip_limit=(1.0, 3.0), tile_grid_size=(8, 8), p=0.3),
+            #         # 通道混洗 - 增强模型对颜色不变特征的学习
+            #         A.ChannelShuffle(p=0.1)
+            #     ], p=0.2),
+                
+            #     # 5. 小目标特定增强
+            #     # A.OneOf([
+            #     #     # 随机网格下降 - 模拟目标被部分遮挡
+            #     #     A.GridDropout(ratio=0.05, holes_number_xy=(4, 4), 
+            #     #                  random_offset=True,fill=144, p=0.2),
+            #     #     # 随机擦除 - 增强模型对部分可见目标的鲁棒性
+            #     #     A.CoarseDropout(p=0.2)
+            #     # ], p=0.2),
+            # ]
 
             # Compose transforms
             self.contains_spatial = any(transform.__class__.__name__ in spatial_transforms for transform in T)
