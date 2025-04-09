@@ -129,3 +129,4 @@ tracker: botsort.yaml # (str) tracker type, choices=[botsort.yaml, bytetrack.yam
 
 logger: #
 model_dict_str: #
+data_layout: images-labels

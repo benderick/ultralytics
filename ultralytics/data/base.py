@@ -64,6 +64,7 @@ class BaseDataset(Dataset):
     ):
         """Initialize BaseDataset with given configuration and options."""
         super().__init__()
+        self.data_layout = hyp.get("data_layout", "images-labels")
         self.img_path = img_path
         self.imgsz = imgsz
         self.augment = augment
@@ -115,8 +116,8 @@ class BaseDataset(Dataset):
                 elif p.is_file():  # file
                     with open(p, encoding="utf-8") as t:
                         t = t.read().strip().splitlines()
-                        parent = str(p.parent) + os.sep
-                        f += [x.replace("./", parent) if x.startswith("./") else x for x in t]  # local to global path
+                        parent = str(p.parent.parent.parent) + os.sep
+                        f += [parent+x if not x.startswith("/") else x for x in t]  # local to global path
                         # F += [p.parent / x.lstrip(os.sep) for x in t]  # local to global path (pathlib)
                 else:
                     raise FileNotFoundError(f"{self.prefix}{p} does not exist")
@@ -152,15 +153,16 @@ class BaseDataset(Dataset):
         """Loads 1 image from dataset index 'i', returns (im, resized hw)."""
         im, f, fn = self.ims[i], self.im_files[i], self.npy_files[i]
         if im is None:  # not cached in RAM
-            if fn.exists():  # load npy
-                try:
-                    im = np.load(fn)
-                except Exception as e:
-                    LOGGER.warning(f"{self.prefix}WARNING ⚠️ Removing corrupt *.npy image file {fn} due to: {e}")
-                    Path(fn).unlink(missing_ok=True)
-                    im = cv2.imread(f)  # BGR
-            else:  # read image
-                im = cv2.imread(f)  # BGR
+            # if fn.exists():  # load npy
+            #     try:
+            #         im = np.load(fn)
+            #     except Exception as e:
+            #         LOGGER.warning(f"{self.prefix}WARNING ⚠️ Removing corrupt *.npy image file {fn} due to: {e}")
+            #         Path(fn).unlink(missing_ok=True)
+            #         im = cv2.imread(f)  # BGR
+            # else:  # read image
+            #     im = cv2.imread(f)  # BGR
+            im = cv2.imread(f)  # BGR
             if im is None:
                 raise FileNotFoundError(f"Image Not Found {f}")
 
