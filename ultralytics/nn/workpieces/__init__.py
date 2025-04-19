@@ -64,14 +64,17 @@ current_repeat_modules = yaml_data.get('repeat_modules', [])
 def is_subset(list1, list2):
     return set(list1).issubset(set(list2))
 
+def is_equal_set(list1, list2):
+    return set(list1) == set(list2)
+
 # 检查是否需要更新yaml
-if is_subset(classes_with_n, current_base_modules) and is_subset(classes_without_n, current_base_modules) and is_subset(classes_with_n, current_repeat_modules):
+if is_equal_set(classes_with_n+classes_without_n, current_base_modules) and is_equal_set(classes_with_n, current_repeat_modules):
     pass
 else:
     # base_modules 包含所有类（去重）
-    updated_base_modules = list(set(current_base_modules + classes_with_n + classes_without_n))
+    updated_base_modules = list(set(classes_with_n + classes_without_n))
     # repeat_modules 只包含带 n 的类（去重）
-    updated_repeat_modules = list(set(current_repeat_modules + classes_with_n))
+    updated_repeat_modules = list(set(classes_with_n))
 
 
     yaml_data['base_modules'] = updated_base_modules

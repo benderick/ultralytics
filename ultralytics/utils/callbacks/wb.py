@@ -155,7 +155,7 @@ def on_fit_epoch_end(trainer):
         run.map = eval(run.map) + [trainer.metrics["metrics/mAP50-95(B)"]]
         run.map50 = eval(run.map50) + [trainer.metrics["metrics/mAP50(B)"]]
         run.save()
-    
+        return # 暂停低指标中断
         # 对于非基本模型，在低于基本模型的map和map50时停止训练
         if not run.is_basic:
             idx = epoche_list.index(trainer.epoch)

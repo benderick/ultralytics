@@ -1,8 +1,5 @@
 # 检测头
-from .AFPNHead import *
-from .AFPN4Head import *
-from .ASFFHead import *
-from .ASFF4Head import *
+from .head import *
 
 # 注意力
 from .TripleAttention import *
@@ -10,4 +7,23 @@ from .TripleAttention import *
 # 上采样
 from .Dysample import *
 
-detection_head_list = (AFPNHead, AFPN4Head, ASFFHead, ASFF4Head)
+from .EIEStem import *
+
+from .LAWDS import *
+
+
+# 检测头列表---------------------------------
+detection_head_list = []
+
+# 检查 head 模块是否有 __all__ 属性
+if hasattr(head, '__all__'):
+    # 遍历 __all__ 中定义的名称
+    for name in head.__all__:
+        try:
+            # 获取名称对应的对象并添加到列表中
+            detection_head_list.append(getattr(head, name))
+        except AttributeError:
+            # 如果 __all__ 中的名称在模块中实际不存在，则跳过
+            print(f"警告：head.__all__ 中定义的 '{name}' 在 head 模块中未找到。")
+else:
+    print("警告：head 模块未定义 __all__，将尝试导入所有公共成员。")

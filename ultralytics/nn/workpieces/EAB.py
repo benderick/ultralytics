@@ -10,7 +10,7 @@ from .FreqSpatial import FreqSpatial
 from ultralytics.nn.modules.block import C3k, C2f
 from ultralytics.nn.modules.conv import Conv
 
-__all__ = ["C3k2_MAB1", "C3k2_SmallMAB", "C3k2_EnhancedMAB", "C3k2_FreqEnhancedMAB"]
+# __all__ = ["C3k2_MAB1", "C3k2_SmallMAB", "C3k2_EnhancedMAB", "C3k2_FreqEnhancedMAB"]
 
 # LKA from VAN (https://github.com/Visual-Attention-Network)
 

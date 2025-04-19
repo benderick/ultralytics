@@ -953,6 +953,43 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
     components_path = Path(__file__).parent / 'components.yaml'
     components = yaml_load(components_path)
     
+    default_base_modules=[
+            "Classify",
+            "Conv",
+            "ConvTranspose",
+            "GhostConv",
+            "Bottleneck",
+            "GhostBottleneck",
+            "SPP",
+            "SPPF",
+            "C2fPSA",
+            "C2PSA",
+            "DWConv",
+            "Focus",
+            "BottleneckCSP",
+            "C1",
+            "C2",
+            "C2f",
+            "C3k2",
+            "RepNCSPELAN4",
+            "ELAN1",
+            "ADown",
+            "AConv",
+            "SPPELAN",
+            "C2fAttn",
+            "C3",
+            "C3TR",
+            "C3Ghost",
+            "nn.ConvTranspose2d",
+            "DWConvTranspose2d",
+            "C3x",
+            "RepC3",
+            "PSA",
+            "SCDown",
+            "C2fCIB",
+            "A2C2f",
+    ]
+    
     # 构建base_modules集合
     base_modules = frozenset({
         getattr(torch.nn, name[3:])
@@ -960,8 +997,26 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             else getattr(__import__("torchvision").ops, name[16:])
             if "torchvision.ops." in name
             else globals()[name]
-        for name in components['base_modules']
+        for name in components['base_modules'] + default_base_modules
     })
+    
+    default_repeat_modules = [
+            "BottleneckCSP",
+            "C1",
+            "C2",
+            "C2f",
+            "C3k2",
+            "C2fAttn",
+            "C3",
+            "C3TR",
+            "C3Ghost",
+            "C3x",
+            "RepC3",
+            "C2fPSA",
+            "C2fCIB",
+            "C2PSA",
+            "A2C2f",
+    ]
     
     # 构建repeat_modules集合 
     repeat_modules = frozenset({
@@ -970,7 +1025,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             else getattr(__import__("torchvision").ops, name[16:])
             if "torchvision.ops." in name
             else globals()[name]
-        for name in components['repeat_modules']
+        for name in components['repeat_modules'] + default_repeat_modules
     })
 
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
@@ -1008,8 +1063,11 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
                     args.extend((True, 1.2))
         elif m is AIFI:
             args = [ch[f], *args]
-        elif m in frozenset({HGStem, HGBlock}):
+        elif m in frozenset({HGStem, HGBlock, EIEStem}):
             c1, cm, c2 = ch[f], args[0], args[1]
+            if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
+                c2 = make_divisible(min(c2, max_channels) * width, 8)
+                cm = make_divisible(min(cm, max_channels) * width, 8)
             args = [c1, cm, c2, *args[2:]]
             if m is HGBlock:
                 args.insert(4, n)  # number of repeats
@@ -1038,7 +1096,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             c2 = args[0]
             c1 = ch[f]
             args = [*args[1:]]
-        elif m in frozenset({Dy_Sample, TripleAttention}): 
+        elif m in frozenset({Dy_Sample, TripleAttention, LAWDS}): 
             c2 = ch[f]
             args = [c2, *args]
         else:
