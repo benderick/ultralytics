@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from basicsr.utils.registry import ARCH_REGISTRY
+# from basicsr.utils.registry import ARCH_REGISTRY
 from .FreqSpatial import FreqSpatial
 from ultralytics.nn.modules.block import C3k, C2f
 from ultralytics.nn.modules.conv import Conv

@@ -128,7 +128,7 @@ my-extra = [
     "hydra-colorlog==1.2.0",
     "hydra-core==1.3.2",
     "PyWavelets",
-    "basicsr",
+    # "basicsr",
 ]
 
 [project.urls]
