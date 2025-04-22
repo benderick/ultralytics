@@ -11,6 +11,7 @@ from .TripleAttention import *
 from .CSPOmniKernel import *
 from .SimAM import *
 from .BlurPool import *
+from .D2SUpsample import *
 
 # __all__ = []
 

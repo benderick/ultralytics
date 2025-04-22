@@ -1103,7 +1103,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             c1 = [ch[x] for x in f]
             c2 = c1[-1]
             args = [c1, c2]
-        elif m in {CSPOmniKernel, BlurPool}:
+        elif m in {CSPOmniKernel, BlurPool, D2SUpsample}:
             c2 = ch[f]
             args = [c2]
         elif m in {SimAM}:
