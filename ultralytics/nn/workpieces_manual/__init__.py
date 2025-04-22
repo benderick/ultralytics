@@ -1,15 +1,8 @@
 # 检测头
 from .head import *
 
-# 注意力
-from .TripleAttention import *
-
-# 上采样
-from .Dysample import *
-
-from .EIEStem import *
-
-from .LAWDS import *
+# 其它，需要自定义参数的
+from .others import *
 
 
 # 检测头列表---------------------------------

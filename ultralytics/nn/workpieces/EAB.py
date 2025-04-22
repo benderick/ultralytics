@@ -43,7 +43,7 @@ class LayerNorm(nn.Module):
 
 
 class SmallObjectGLKA(nn.Module):
-    def __init__(self, n_feats, k=2, squeeze_factor=15):
+    def __init__(self, n_feats):
         super().__init__()
         i_feats = 2 * n_feats
 
@@ -104,81 +104,39 @@ class SmallObjectGLKA(nn.Module):
 
         return x
 
-class SGAB_Shallow(nn.Module):
-    """
-    空间门控注意力模块 (Spatial Gated Attention Block) - 针对浅层特征优化版。
-    主要修改：将用于生成门控信号的深度卷积核尺寸从 7x7 减小到 3x3，
-    以更好地捕捉和保留浅层特征中的局部细节。
-    """
+class SGAB(nn.Module):
     def __init__(self, n_feats):
-        """
-        初始化 SGAB_Shallow 模块。
-
-        Args:
-            n_feats (int): 输入特征图的通道数。
-        """
         super().__init__()
-        # 扩展后的通道数，保持与原 SGAB 一致，为输入通道数的两倍
         i_feats = n_feats * 2
-
-        # 第一个 1x1 卷积，用于扩展通道数
-        # 输入通道 n_feats, 输出通道 i_feats
-        self.Conv1 = nn.Conv2d(n_feats, i_feats, kernel_size=1, stride=1, padding=0)
-
-        # 深度可分离卷积 (Depthwise Convolution)，用于生成门控信号 a
-        # 输入通道 n_feats (来自 chunk 操作后), 输出通道 n_feats
-        # *** 修改点：将卷积核大小从 7x7 减小到 3x3 ***
-        # 3x3 卷积核更适合捕捉浅层特征的局部模式
-        # padding=1 保持特征图尺寸不变 (对于 3x3 核)
-        # groups=n_feats 表示这是一个深度卷积，每个通道独立进行卷积
-        self.DWConv1 = nn.Conv2d(n_feats, n_feats, kernel_size=3, stride=1, padding=1, groups=n_feats)
-
-        # 第二个 1x1 卷积，用于压缩通道数，恢复到 n_feats
-        # 输入通道 n_feats, 输出通道 n_feats
-        self.Conv2 = nn.Conv2d(n_feats, n_feats, kernel_size=1, stride=1, padding=0)
-
-        # 层归一化 (Layer Normalization)，对输入特征进行归一化，稳定训练
-        # data_format='channels_first' 表示输入形状为 (Batch, Channels, Height, Width)
         self.norm = LayerNorm(n_feats, data_format='channels_first')
 
-        # 可学习的缩放参数 (scale)，用于调整模块输出的强度
-        # 初始化为 0，使得在训练初期模块接近于恒等映射（通过残差连接）
+        self.Conv1 = nn.Conv2d(n_feats, i_feats, 1, 1, 0)
+        self.DWConv1 = nn.Conv2d(n_feats, n_feats, 5, 1, 5 // 2, groups=n_feats)
+
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
+        
+        
+        self.Conv2 = nn.Conv2d(n_feats, 1, 3, 1, padding=1)  # 生成空间注意力图
+        self.Conv3 = nn.Conv2d(i_feats, n_feats, 1, 1, 0)
+            
 
     def forward(self, x):
-        """
-        SGAB_Shallow 的前向传播过程。
+        x = self.norm(x)
+        x2 = x.clone()
 
-        Args:
-            x (torch.Tensor): 输入特征图，形状 (B, C, H, W)。
+        # Ghost Expand
+        x = self.Conv1(x)
+        a, x = torch.chunk(x, 2, dim=1)
+        x = x * self.DWConv1(a)
+        
+        x3 = self.Conv2(x2)
+        x3 = x2 * x3
+        
+        x = torch.cat([x, x3], dim=1)
+        x = self.Conv3(x)
+        
 
-        Returns:
-            torch.Tensor: 输出特征图，形状与输入相同。
-        """
-        # 保存原始输入，用于最后的残差连接
-        shortcut = x.clone()
-
-        # 1. 对输入特征进行层归一化
-        normalized_x = self.norm(x)
-
-        # 2. 通过 Conv1 扩展通道
-        expanded_x = self.Conv1(normalized_x) # 形状: (B, 2*C, H, W)
-
-        # 3. 将扩展后的特征在通道维度上分割为两部分：
-        #    a: 用于生成门控信号 (形状: B, C, H, W)
-        #    gated_x: 将被门控的特征 (形状: B, C, H, W)
-        a, gated_x = torch.chunk(expanded_x, 2, dim=1)
-
-        # 4. 生成门控信号并应用门控：
-        #    将 a 通过 DWConv1 (3x3 深度卷积) 得到门控权重
-        #    将门控权重与 gated_x 逐元素相乘
-        gated_x = gated_x * self.DWConv1(a) # 形状: (B, C, H, W)
-
-        # 5. 通过 Conv2 压缩通道（特征融合）
-        output = self.Conv2(gated_x) # 形状: (B, C, H, W)
-
-        # 6. 应用可学习的缩放参数 self.scale，并加上残差连接 shortcut
-        return output * self.scale + shortcut
+        return x
 
 class MAB(nn.Module):
     def __init__(
@@ -187,7 +145,7 @@ class MAB(nn.Module):
 
         self.LKA = SmallObjectGLKA(n_feats)
 
-        self.LFE = SGAB_Shallow(n_feats)
+        self.LFE = SGAB(n_feats)
 
     def forward(self, x, pre_attn=None, RAA=None):
         # large kernel attention
@@ -264,7 +222,7 @@ class EMAB(nn.Module):
         self.LKA = SmallObjectGLKA(n_feats)
         
         # 局部特征提取 - 精细化特征表示
-        self.LFE = SGAB_Shallow(n_feats)
+        self.LFE = SGAB(n_feats)
         
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
         
@@ -377,7 +335,7 @@ if __name__ == "__main__":
     image = torch.rand(*image_size)
 
     # Model
-    model = EMAB(36)
+    model = MAB(36)
 
     out = model(image)
     print(out.size())

@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from ultralytics.nn.modules.block import C2f
-from ..modules.conv import Conv
+from ...modules.conv import Conv
 from einops import rearrange
 
 __all__ = ["LAWDS"]

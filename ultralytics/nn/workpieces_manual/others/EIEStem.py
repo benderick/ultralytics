@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from ..modules.conv import Conv
+from ...modules.conv import Conv
 import numpy as np
 
 __all__ = ["EIEStem"]

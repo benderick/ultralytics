@@ -1063,7 +1063,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
                     args.extend((True, 1.2))
         elif m is AIFI:
             args = [ch[f], *args]
-        elif m in frozenset({HGStem, HGBlock, EIEStem}):
+        elif m in frozenset({HGStem, HGBlock, EIEStem}): # type: ignore
             c1, cm, c2 = ch[f], args[0], args[1]
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
                 c2 = make_divisible(min(c2, max_channels) * width, 8)
@@ -1096,9 +1096,19 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             c2 = args[0]
             c1 = ch[f]
             args = [*args[1:]]
-        elif m in frozenset({Dy_Sample, TripleAttention, LAWDS}): 
+        elif m in frozenset({Dy_Sample, TripleAttention, LAWDS}):  # type: ignore
             c2 = ch[f]
-            args = [c2, *args]
+            args = [*args]
+        elif m in {SBA}: # type: ignore
+            c1 = [ch[x] for x in f]
+            c2 = c1[-1]
+            args = [c1, c2]
+        elif m in {CSPOmniKernel, BlurPool}:
+            c2 = ch[f]
+            args = [c2]
+        elif m in {SimAM}:
+            c2 = ch[f]
+            args = [*args]
         else:
             c2 = ch[f]
 
