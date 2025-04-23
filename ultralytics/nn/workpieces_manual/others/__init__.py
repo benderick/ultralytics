@@ -12,6 +12,7 @@ from .CSPOmniKernel import *
 from .SimAM import *
 from .BlurPool import *
 from .D2SUpsample import *
+from .MFM import *
 
 # __all__ = []
 

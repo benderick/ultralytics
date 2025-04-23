@@ -54,7 +54,7 @@ from ultralytics.utils.torch_utils import (
     torch_distributed_zero_first,
     unset_deterministic,
 )
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+# from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from omegaconf import DictConfig
 
 class BaseTrainer:
@@ -216,17 +216,17 @@ class BaseTrainer:
     def _setup_scheduler(self):
         """Initialize training learning rate scheduler."""
         if self.args.cos_lr:
-            # self.lf = one_cycle(1, self.args.lrf, self.epochs)  # cosine 1->hyp['lrf']
-            self.scheduler = CosineAnnealingWarmRestarts(
-                                self.optimizer,
-                                T_0=10,
-                                T_mult= 2,
-                                eta_min= 5e-4,
-                                )
-            self.lf = lambda x: max(1 - x / self.epochs, 0) * (1.0 - self.args.lrf) + self.args.lrf  # linear
+            self.lf = one_cycle(1, self.args.lrf, self.epochs)  # cosine 1->hyp['lrf']
+            # self.scheduler = CosineAnnealingWarmRestarts(
+            #                     self.optimizer,
+            #                     T_0=10,
+            #                     T_mult= 2,
+            #                     eta_min= 5e-4,
+            #                     )
+            # self.lf = lambda x: max(1 - x / self.epochs, 0) * (1.0 - self.args.lrf) + self.args.lrf  # linear
         else:
             self.lf = lambda x: max(1 - x / self.epochs, 0) * (1.0 - self.args.lrf) + self.args.lrf  # linear
-            self.scheduler = optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=self.lf)     
+        self.scheduler = optim.lr_scheduler.LambdaLR(self.optimizer, lr_lambda=self.lf)     
 
     def _setup_ddp(self, world_size):
         """Initializes and sets the DistributedDataParallel parameters for training."""
@@ -359,11 +359,11 @@ class BaseTrainer:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")  # suppress 'Detected lr_scheduler.step() before optimizer.step()'
                 self.scheduler.step()
-                if isinstance(self.scheduler, CosineAnnealingWarmRestarts):
-                    # 当前 epoch + batch 进度（在外层每轮调用时只传整数 epoch 会出错）
-                    self.scheduler.step(epoch)
-                else:
-                    self.scheduler.step()
+                # if isinstance(self.scheduler, CosineAnnealingWarmRestarts):
+                #     # 当前 epoch + batch 进度（在外层每轮调用时只传整数 epoch 会出错）
+                #     self.scheduler.step(epoch)
+                # else:
+                #     self.scheduler.step()
 
             self.model.train()
             if RANK != -1:
@@ -409,7 +409,7 @@ class BaseTrainer:
                 # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
                 if ni - last_opt_step >= self.accumulate:
                     self.optimizer_step()
-                    self.scheduler.step(epoch + i / nb)
+                    # self.scheduler.step(epoch + i / nb)
                     last_opt_step = ni
 
                     # Timed stopping
