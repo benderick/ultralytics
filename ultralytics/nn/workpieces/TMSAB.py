@@ -128,12 +128,13 @@ class TLKA_v2(nn.Module):
     def forward(self, x):
         shortcut = x.clone()
        
+       
         x1 = self.LKA3(x) # 3x3 卷积处理
-        a1 = torch.sigmoid(self.X3(x1)) # 3x3 卷积处理
+        # a1 = torch.sigmoid(self.X3(x1)) # 3x3 卷积处理
         x2 = self.LKA5(x) # 5x5 卷积处理
-        a2 = torch.sigmoid(self.X5(x2))
+        # a2 = torch.sigmoid(self.X5(x2))
 
-        return (x1 * a2 + x2 * a1) * self.scale + shortcut # 残差连接
+        return (x1 * x2) * self.scale + shortcut # 残差连接
     
 class TLKA_v3(nn.Module):
     """
