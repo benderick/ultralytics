@@ -120,33 +120,20 @@ class TLKA_v2(nn.Module):
             nn.Conv2d(split2, split2, 7, 1, padding=(7 // 2) * 2, groups=split2, dilation=2),
             Conv(split2, split2, 1, 1, 0)
         )
+        
+        self.X3 = Conv(split2, split2, 1, 1, 0)
         self.X5 = Conv(split2, split2, 1, 1, 0)
         
-        # 可选：归一化层，提升训练稳定性
-        self.norm = nn.BatchNorm2d(n_feats)
-
-        # 可选：激活函数，增强非线性表达
-        self.act = nn.SiLU(inplace=True)
 
     def forward(self, x):
         shortcut = x.clone()
-        
-        a = x.clone()
-           
-        a = self.X5(self.LKA5(a))
-        a = torch.sigmoid(a)
-        
-        x = self.LKA3(x)
-        x = x * a
-        
-        # 可选：归一化和激活
-        x = self.norm(x)
-        x = self.act(x)
+       
+        x1 = self.LKA3(x) # 3x3 卷积处理
+        a1 = torch.sigmoid(self.X3(x1)) # 3x3 卷积处理
+        x2 = self.LKA5(x) # 5x5 卷积处理
+        a2 = torch.sigmoid(self.X5(x2))
 
-        # 应用注意力并通过1×1卷积调整通道，加上残差连接
-        x = x * self.scale + shortcut
-
-        return x
+        return (x1 * a2 + x2 * a1) * self.scale + shortcut # 残差连接
     
 class TLKA_v3(nn.Module):
     """
