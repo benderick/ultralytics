@@ -113,12 +113,12 @@ class TLKA_v2(nn.Module):
         self.LKA3 = nn.Sequential(
             nn.Conv2d(split1, split1, 3, 1, 1, groups= split1),  
             nn.Conv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
-            Conv(split1, split1, 1, 1, 0))
+            nn.Conv2d(split1, split1, 1, 1, 0))
         # 5×5 卷积分支 - 提供稍大的感受野但仍保持精细特征
         self.LKA5 = nn.Sequential(
             nn.Conv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
             nn.Conv2d(split2, split2, 7, 1, padding=(7 // 2) * 2, groups=split2, dilation=2),
-            Conv(split2, split2, 1, 1, 0)
+            nn.Conv2d(split2, split2, 1, 1, 0)
         )
         
         self.X3 = Conv(split2, split2, 1, 1, 0)
@@ -126,7 +126,8 @@ class TLKA_v2(nn.Module):
         
         # 可选：归一化层，提升训练稳定性
         self.norm = nn.BatchNorm2d(n_feats)
-        
+        # 激活函数，增强非线性表达能力
+        self.act = nn.SiLU(inplace=True)
 
     def forward(self, x):
         shortcut = x.clone()
@@ -138,6 +139,7 @@ class TLKA_v2(nn.Module):
         
         x = x1 * x2
         x = self.norm(x) # 归一化处理
+        x = self.act(x)
 
         return x * self.scale + shortcut # 残差连接
     
