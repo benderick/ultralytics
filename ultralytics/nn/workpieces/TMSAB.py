@@ -103,7 +103,7 @@ class TLKA_v2(nn.Module):
     def __init__(self, n_feats):
         super().__init__()
         
-        self.scale = nn.Parameter(torch.ones((1, n_feats, 1, 1)), requires_grad=True)
+        self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
 
         split1 = n_feats
         split2 = n_feats
@@ -124,22 +124,26 @@ class TLKA_v2(nn.Module):
         self.X3 = Conv(split2, split2, 1, 1, 0)
         self.X5 = Conv(split2, split2, 1, 1, 0)
         
-        # 可选：归一化层，提升训练稳定性
-        self.norm = nn.BatchNorm2d(n_feats)
-        # 激活函数，增强非线性表达能力
-        self.act = nn.SiLU(inplace=True)
+        self.proj_first = nn.Sequential(
+            Conv(n_feats, n_feats*2, 1, 1, 0))
+
+        self.proj_last = nn.Sequential(
+            Conv(n_feats, n_feats, 1, 1, 0))
 
     def forward(self, x):
         shortcut = x.clone()
+        
+        x = self.proj_first(x)
+        
+        x1, x2 = torch.chunk(x, 2, dim=1)
        
-        x1 = self.LKA3(x) # 3x3 卷积处理
+        x1 = self.LKA3(x1) # 3x3 卷积处理
         # a1 = torch.sigmoid(self.X3(x1)) # 3x3 卷积处理
-        x2 = self.LKA5(x) # 5x5 卷积处理
+        x2 = self.LKA5(x2) # 5x5 卷积处理
         # a2 = torch.sigmoid(self.X5(x2))
         
         x = x1 * x2
-        x = self.norm(x) # 归一化处理
-        x = self.act(x)
+        x = self.proj_last(x) # 1x1 卷积处理
 
         return x * self.scale + shortcut # 残差连接
     
