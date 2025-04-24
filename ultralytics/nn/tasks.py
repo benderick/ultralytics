@@ -1096,9 +1096,9 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             c2 = args[0]
             c1 = ch[f]
             args = [*args[1:]]
-        elif m in frozenset({Dy_Sample, TripleAttention, LAWDS}):  # type: ignore
+        elif m in frozenset({Dy_Sample, TripleAttention, LAWDS, CoordAtt}):  # type: ignore
             c2 = ch[f]
-            args = [*args]
+            args = [c2, *args]
         elif m in {SBA}: # type: ignore
             c1 = [ch[x] for x in f]
             c2 = c1[-1]

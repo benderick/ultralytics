@@ -9,6 +9,8 @@ import torch.nn.functional as F
 from ultralytics.nn.workpieces.FreqSpatial import FreqSpatial
 from ultralytics.nn.modules.block import C3k, C2f
 from ultralytics.nn.modules.conv import Conv
+from ultralytics.nn.workpieces.DSConv import DSConv
+from ultralytics.nn.workpieces_manual import CoordAtt
 
 __all__ = ["TMSAB"]
 
@@ -95,7 +97,103 @@ class TLKA_v1(nn.Module):
         
         x = self.proj_last(x*a)*self.scale + shortcut
         
-        return x     
+        return x   
+    
+class TLKA_v2(nn.Module):
+    def __init__(self, n_feats):
+        super().__init__()
+        
+        self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
+
+        split1 = n_feats
+        split2 = n_feats
+
+        # 定义两个较小尺度的卷积块，适合小目标检测
+        # 3×3 卷积分支 - 用于捕获更细粒度的特征
+        self.LKA3 = nn.Sequential(
+            nn.Conv2d(split1, split1, 3, 1, 1, groups= split1),  
+            nn.Conv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
+            Conv(split1, split1, 1, 1, 0))
+        # 5×5 卷积分支 - 提供稍大的感受野但仍保持精细特征
+        self.LKA5 = nn.Sequential(
+            nn.Conv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
+            nn.Conv2d(split2, split2, 7, 1, padding=(7 // 2) * 2, groups=split2, dilation=2),
+            Conv(split2, split2, 1, 1, 0)
+        )
+        self.X5 = Conv(split2, split2, 1, 1, 0)
+        
+        # 可选：归一化层，提升训练稳定性
+        self.norm = nn.BatchNorm2d(n_feats)
+
+        # 可选：激活函数，增强非线性表达
+        self.act = nn.SiLU(inplace=True)
+
+    def forward(self, x):
+        shortcut = x.clone()
+        
+        a = x.clone()
+           
+        a = self.X5(self.LKA5(a))
+        a = torch.sigmoid(a)
+        
+        x = self.LKA3(x)
+        x = x * a
+        
+        # 可选：归一化和激活
+        x = self.norm(x)
+        x = self.act(x)
+
+        # 应用注意力并通过1×1卷积调整通道，加上残差连接
+        x = x * self.scale + shortcut
+
+        return x
+    
+class TLKA_v3(nn.Module):
+    """
+    修改后的 TLKA 版本，融合 Coordinate Attention (CoordAtt) 来生成指导信号。
+    """
+    def __init__(self, n_feats, reduction=32): # 添加 CoordAtt 的 reduction 参数
+        # 初始化函数
+        super().__init__()
+
+        # 可学习的缩放参数，用于最终的残差连接
+        self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
+
+        # 定义 LKA3 分支：较小感受野，捕获细节
+        # 使用 DSConv (深度可分离卷积) 来实现
+        self.LKA3 = DSConv(n_feats, n_feats, 3, 1, 3 // 2, n_feats) # 3x3 深度可分离卷积
+
+        # --- 融合 CoordAtt ---
+        # 使用 CoordAtt 模块生成指导信号 a
+        # 输入输出通道数均为 n_feats
+        self.coord_att = CoordAtt(n_feats, reduction=reduction)
+
+        # --- 移除原有的 LKA5 和 X5 分支 ---
+        # self.LKA5 = nn.Sequential(...)
+        # self.X5 = Conv(...)
+
+    def forward(self, x):
+        # 前向传播
+        shortcut = x.clone() # 保存原始输入，用于最后的残差连接
+
+        # --- 特征处理 ---
+        # 1. 使用 LKA3 处理原始输入 x，获取较小感受野的特征
+        processed_x = self.LKA3(x) # processed_x 的形状为 (B, n_feats, H, W)
+
+        # --- 指导信号生成 (使用 CoordAtt) ---
+        # 2. 使用 CoordAtt 处理原始输入 x，直接获取注意力图 a
+        #    调用 forward 时设置 return_map=True
+        a = self.coord_att(x) # a 的形状为 (B, n_feats, H, W)
+
+        # --- 指导应用 ---
+        # 3. 将 CoordAtt 生成的注意力图 a 逐元素乘以 LKA3 处理后的特征
+        x = processed_x * a # 应用通道特定的空间注意力
+
+        # --- 输出 ---
+        # 应用可学习的缩放参数 self.scale 并加上残差连接 shortcut
+        x = x * self.scale + shortcut
+
+        return x
 
 class TLKA(nn.Module):
     def __init__(self, n_feats):
@@ -189,6 +287,7 @@ class SGAB(nn.Module):
         return x
     
 class SGAB_v1(nn.Module):
+    """ use BN not LN """
     def __init__(self, n_feats):
         super().__init__()
         i_feats = n_feats * 2
@@ -214,13 +313,12 @@ class SGAB_v1(nn.Module):
 
         return x * self.scale + shortcut
 
-
 class MAB(nn.Module):
     def __init__(
             self, n_feats):
         super().__init__()
 
-        self.LKA = TLKA_v1(n_feats)
+        self.LKA = TLKA_v2(n_feats)
 
         self.LFE = SGAB_v1(n_feats)
 

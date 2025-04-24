@@ -13,6 +13,7 @@ from .SimAM import *
 from .BlurPool import *
 from .D2SUpsample import *
 from .MFM import *
+from .CoordAtt import *
 
 # __all__ = []
 
