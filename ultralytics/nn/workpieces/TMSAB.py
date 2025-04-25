@@ -113,13 +113,13 @@ class TLKA_v2(nn.Module):
         # 3×3 卷积分支 - 用于捕获更细粒度的特征
         self.LKA3 = nn.Sequential(
             nn.Conv2d(split1, split1, 3, 1, 1, groups= split1),  
-            nn.Conv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
+            nn.Conv2d(split1, split1, 3, stride=1, padding=(3//2)*2, groups=split1, dilation=2),
             nn.Conv2d(split1, split1, 1, 1, 0))
         
         # 5×5 卷积分支 - 提供稍大的感受野但仍保持精细特征
         self.LKA5 = nn.Sequential(
             nn.Conv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
-            nn.Conv2d(split2, split2, 7, 1, padding=(7 // 2) * 2, groups=split2, dilation=2),
+            nn.Conv2d(split2, split2, 5, 1, padding=(5 // 2) * 2, groups=split2, dilation=2),
             nn.Conv2d(split2, split2, 1, 1, 0)
         )
         
