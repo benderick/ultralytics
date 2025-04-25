@@ -12,7 +12,7 @@ from ultralytics.nn.modules.conv import Conv
 from ultralytics.nn.workpieces.DSConv import DSConv
 from ultralytics.nn.workpieces_manual import CoordAtt
 
-__all__ = ["TMSAB"]
+__all__ = ["TMSAB", "TMSAB_v2"]
 
 
 class LayerNorm(nn.Module):
@@ -311,6 +311,23 @@ class SGAB_v1(nn.Module):
         x = self.Conv3(x)
 
         return x * self.scale + shortcut
+    
+class SGAB_v2(nn.Module):
+    """ use BN not LN """
+    def __init__(self, inc, outc):
+        super().__init__()
+
+        self.DWConv1 = nn.Conv2d(outc, outc, 5, 1, 5 // 2, groups=outc)
+
+        self.scale = nn.Parameter(torch.zeros((1, outc, 1, 1)), requires_grad=True)            
+
+    def forward(self, x):
+
+        x, a = torch.chunk(x, 2, dim=1)
+        x = x * self.DWConv1(a)
+        x = self.Conv3(x)
+
+        return x * self.scale
 
 class MAB(nn.Module):
     def __init__(
@@ -339,7 +356,49 @@ class TMSAB(C2f):
         self.m = nn.ModuleList(
             MAB(self.c) if enhance else MAB(self.c) for _ in range(n)
         )
+
+class TMSAB_v2(nn.Module):
+    """Faster Implementation of CSP Bottleneck with 2 convolutions."""
+    
+    def __init__(self, c1, c2, n=1, enhance=False, e=0.5, shortcut=False,):
+        """Initializes a CSP bottleneck with 2 convolutions and n Bottleneck blocks for faster processing."""
+        super().__init__()
+        self.c = int(c2 * e)  # hidden channels
+        self.cv1 = Conv(c1, 2 * self.c, 1, 1)
+        self.cv2 = Conv((1 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
+        self.m = nn.ModuleList(
+            MAB(self.c) if enhance else MAB(self.c) for _ in range(n)
+        )
+        self.DWConv1 = nn.Conv2d(self.c, self.c, 5, 1, 5 // 2, groups=self.c)
         
+    def forward(self, x):
+        """Forward pass through C2f layer."""
+        # y = list(self.cv1(x).chunk(2, 1))
+        x = self.cv1(x)
+        x1, x2 = torch.chunk(x, 2, dim=1)
+        y = list(m(x2) for m in self.m)
+        x1 = x1 * self.DWConv1(x2)
+        y.append(x1)
+        y = torch.cat(y, 1)
+        return self.cv2(y)
+          
+        
+class C2f(nn.Module):
+    """Faster Implementation of CSP Bottleneck with 2 convolutions."""
+
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):
+        """Initializes a CSP bottleneck with 2 convolutions and n Bottleneck blocks for faster processing."""
+        super().__init__()
+        self.c = int(c2 * e)  # hidden channels
+        self.cv1 = Conv(c1, 2 * self.c, 1, 1)
+        self.cv2 = Conv((2 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
+        self.m = nn.ModuleList(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
+
+    def forward(self, x):
+        """Forward pass through C2f layer."""
+        y = list(self.cv1(x).chunk(2, 1))
+        y.extend(m(y[-1]) for m in self.m)
+        return self.cv2(torch.cat(y, 1))
 
 if __name__ == "__main__":
     # Generating Sample image
