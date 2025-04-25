@@ -142,7 +142,7 @@ class TLKA_v2(nn.Module):
         x2 = self.LKA5(x2) # 5x5 卷积处理
         # a2 = torch.sigmoid(self.X5(x2))
         
-        x = x1 * x2
+        x = x1 * x2 + x1 + x2
         x = self.proj_last(x) # 1x1 卷积处理
 
         return x * self.scale + shortcut # 残差连接
