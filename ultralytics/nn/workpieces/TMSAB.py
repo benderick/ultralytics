@@ -100,9 +100,10 @@ class TLKA_v1(nn.Module):
         return x   
     
 class TLKA_v2(nn.Module):
-    def __init__(self, n_feats):
+    def __init__(self, n_feats, shortcut=True):
         super().__init__()
         
+        self.shortcut = shortcut
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
 
         split1 = n_feats
@@ -114,6 +115,7 @@ class TLKA_v2(nn.Module):
             nn.Conv2d(split1, split1, 3, 1, 1, groups= split1),  
             nn.Conv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
             nn.Conv2d(split1, split1, 1, 1, 0))
+        
         # 5×5 卷积分支 - 提供稍大的感受野但仍保持精细特征
         self.LKA5 = nn.Sequential(
             nn.Conv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
@@ -131,7 +133,8 @@ class TLKA_v2(nn.Module):
             Conv(n_feats, n_feats, 1, 1, 0))
 
     def forward(self, x):
-        shortcut = x.clone()
+        if self.shortcut:
+            shortcut = x.clone()
         
         x = self.proj_first(x)
         
@@ -141,11 +144,11 @@ class TLKA_v2(nn.Module):
         # a1 = torch.sigmoid(self.X3(x1)) # 3x3 卷积处理
         x2 = self.LKA5(x2) # 5x5 卷积处理
         # a2 = torch.sigmoid(self.X5(x2))
-        
+                
         x = x1 * x2 + x1 + x2
         x = self.proj_last(x) # 1x1 卷积处理
 
-        return x * self.scale + shortcut # 残差连接
+        return x * self.scale + shortcut if self.shortcut else x# 残差连接
     
 class TLKA_v3(nn.Module):
     """
@@ -252,7 +255,7 @@ class TLKA(nn.Module):
         return x     
 
 class SGAB(nn.Module):
-    def __init__(self, n_feats):
+    def __init__(self, n_feats, shortcut=True):
         super().__init__()
         i_feats = n_feats * 2
         self.norm = LayerNorm(n_feats, data_format='channels_first')
@@ -287,9 +290,10 @@ class SGAB(nn.Module):
     
 class SGAB_v1(nn.Module):
     """ use BN not LN """
-    def __init__(self, n_feats):
+    def __init__(self, n_feats, shortcut=True):
         super().__init__()
         i_feats = n_feats * 2
+        self.shortcut = shortcut
 
         self.Conv1 = nn.Conv2d(n_feats, i_feats, 1, 1, 0)
         self.DWConv1 = nn.Conv2d(n_feats, n_feats, 5, 1, 5 // 2, groups=n_feats)
@@ -302,7 +306,8 @@ class SGAB_v1(nn.Module):
             
 
     def forward(self, x):
-        shortcut = x.clone()
+        if self.shortcut:
+            shortcut = x.clone()
 
         # Ghost Expand
         x = self.Conv1(x)
@@ -310,7 +315,7 @@ class SGAB_v1(nn.Module):
         x = x * self.DWConv1(a)
         x = self.Conv3(x)
 
-        return x * self.scale + shortcut
+        return x * self.scale + shortcut if self.shortcut else x
     
 class SGAB_v2(nn.Module):
     """ use BN not LN """
@@ -330,31 +335,32 @@ class SGAB_v2(nn.Module):
         return x * self.scale
 
 class MAB(nn.Module):
-    def __init__(
-            self, n_feats):
+    def __init__(self, n_feats, enhance=True, shortcut=True):
         super().__init__()
-
-        self.LKA = TLKA_v2(n_feats)
-
-        self.LFE = SGAB_v1(n_feats)
+        self.enhance = enhance
+        
+        self.LKA = TLKA_v2(n_feats, shortcut)
+        if enhance:
+            self.LFE = SGAB_v1(n_feats, shortcut)
 
     def forward(self, x, pre_attn=None, RAA=None):
         # large kernel attention
         x = self.LKA(x)
 
         # local feature extraction
-        x = self.LFE(x)
+        if self.enhance:
+            x = self.LFE(x)
 
-        return x
+        return x 
 
 class TMSAB(C2f):
     """Faster Implementation of CSP Bottleneck with 2 convolutions."""
 
-    def __init__(self, c1, c2, n=1, enhance=False, e=0.5, g=1, shortcut=True):
+    def __init__(self, c1, c2, n=1, enhance=True, e=0.5, shortcut=True, g=1):
         """Initializes the C3k2 module, a faster CSP Bottleneck with 2 convolutions and optional C3k blocks."""
         super().__init__(c1, c2, n, shortcut, g, e)
         self.m = nn.ModuleList(
-            MAB(self.c) if enhance else MAB(self.c) for _ in range(n)
+            MAB(self.c, enhance, shortcut) for _ in range(n)
         )
 
 class TMSAB_v2(nn.Module):
@@ -383,23 +389,6 @@ class TMSAB_v2(nn.Module):
         return self.cv2(y)
           
         
-class C2f(nn.Module):
-    """Faster Implementation of CSP Bottleneck with 2 convolutions."""
-
-    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):
-        """Initializes a CSP bottleneck with 2 convolutions and n Bottleneck blocks for faster processing."""
-        super().__init__()
-        self.c = int(c2 * e)  # hidden channels
-        self.cv1 = Conv(c1, 2 * self.c, 1, 1)
-        self.cv2 = Conv((2 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
-        self.m = nn.ModuleList(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
-
-    def forward(self, x):
-        """Forward pass through C2f layer."""
-        y = list(self.cv1(x).chunk(2, 1))
-        y.extend(m(y[-1]) for m in self.m)
-        return self.cv2(torch.cat(y, 1))
-
 if __name__ == "__main__":
     # Generating Sample image
     image_size = (1, 32, 224, 224)
