@@ -11,7 +11,8 @@ class TLKA_v2(nn.Module):
     def __init__(self, n_feats):
         super().__init__()
         
-        self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
+        self.scale1 = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
+        self.scale2 = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
 
         split1 = n_feats
         split2 = n_feats
@@ -41,9 +42,11 @@ class TLKA_v2(nn.Module):
         x1, x2 = torch.chunk(x, 2, dim=1)
         x1 = self.LKA3(x1) 
         x2 = self.LKA5(x2)
-        x[:,0::2, :, :] = (x1 * x2 + x1 + x2) * x[:,0::2, :, :]
         
-        x = self.proj_last(x)
+        t1 = (x1 + x2) * self.scale1 * x[:,0::2, :, :]
+        t2 = (x1 * x2) * self.scale2 + x[:,1::2, :, :]
+        
+        x = self.proj_last(torch.cat((t1, t2), dim=1))
 
         return x + shortcut
     
