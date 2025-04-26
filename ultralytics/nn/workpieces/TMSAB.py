@@ -10,6 +10,8 @@ __all__ = ["TMSAB"]
 class TLKA_v2(nn.Module):
     def __init__(self, n_feats):
         super().__init__()
+        
+        self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
 
         split1 = n_feats
         split2 = n_feats
@@ -18,22 +20,30 @@ class TLKA_v2(nn.Module):
             nn.Conv2d(split1, split1, 3, 1, 1, groups= split1),  
             nn.Conv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
             nn.Conv2d(split1, split1, 1, 1, 0),
-            nn.SiLU())
+            )
         
         self.LKA5 = nn.Sequential(
             nn.Conv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
             nn.Conv2d(split2, split2, 7, 1, padding=(7 // 2)*2, groups=split2, dilation=2),
             nn.Conv2d(split2, split2, 1, 1, 0),
-            nn.SiLU())
+            )
+        
+        self.proj_first = nn.Sequential(
+            Conv(n_feats, n_feats*2, 1, 1, 0))
+
+        self.proj_last = nn.Sequential(
+            Conv(n_feats*2, n_feats, 1, 1, 0))
 
     def forward(self, x):
-        
         shortcut = x.clone()
         
-        x1 = self.LKA3(x) 
-        x2 = self.LKA5(x)
-                
-        x = (x1 * x2 + x1 + x2) * x
+        x = self.proj_first(x)
+        x1, x2 = torch.chunk(x, 2, dim=1)
+        x1 = self.LKA3(x1) 
+        x2 = self.LKA5(x2)
+        x[:,0::2, :, :] = (x1 * x2 + x1 + x2) * x[:,0::2, :, :]
+        
+        x = self.proj_last(x)
 
         return x + shortcut
     
