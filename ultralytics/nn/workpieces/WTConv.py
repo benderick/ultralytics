@@ -36,7 +36,6 @@ def wavelet_transform(x, filters):
     x = x.reshape(b, c, 4, h // 2, w // 2)
     return x
 
-
 def inverse_wavelet_transform(x, filters):
     b, c, _, h_half, w_half = x.shape
     pad = (filters.shape[2] // 2 - 1, filters.shape[3] // 2 - 1)
@@ -77,13 +76,14 @@ class WTConv2d(nn.Module):
 
         if self.stride > 1:
             self.stride_filter = nn.Parameter(torch.ones(in_channels, 1, 1, 1), requires_grad=False)
-            self.do_stride = lambda x_in: F.conv2d(x_in, self.stride_filter, bias=None, stride=self.stride,
-                                                   groups=in_channels)
+            self.do_stride = self.do_stride_wt
         else:
             self.do_stride = None
+            
+    def do_stride_wt(self, x_in):
+        return F.conv2d(x_in, self.stride_filter, bias=None, stride=self.stride, groups=self.in_channels)
 
     def forward(self, x):
-
         x_ll_in_levels = []
         x_h_in_levels = []
         shapes_in_levels = []
@@ -132,7 +132,6 @@ class WTConv2d(nn.Module):
             x = self.do_stride(x)
 
         return x
-
 
 class _ScaleModule(nn.Module):
     def __init__(self, dims, init_scale=1.0, init_bias=0):
@@ -263,7 +262,7 @@ if __name__ == "__main__":
     image = torch.rand(*image_size)
 
     # Model
-    mobilenet_v1 = C3k2_WTConv(64, 64)
+    mobilenet_v1 = WTConv2d(64, 64, 5, 2)
 
     out = mobilenet_v1(image)
     print(out.size())
