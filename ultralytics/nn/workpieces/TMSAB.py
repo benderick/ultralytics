@@ -39,9 +39,8 @@ class LayerNorm(nn.Module):
 class TLKA_v2(nn.Module):
     def __init__(self, n_feats):
         super().__init__()
-        
         # self.norm = LayerNorm(n_feats, data_format="channels_first")
-        self.norm = SelfNorm(chan_num=n_feats, is_two=True)
+        self.norm = SelfNorm(chan_num=n_feats, is_two=True) 
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
 
         split1 = n_feats
@@ -69,8 +68,8 @@ class TLKA_v2(nn.Module):
         shortcut = x.clone()
         # self.norm.train()
         # self.norm.active = True
-        
-        x = self.norm(x)
+        if x.size()[0] > 1:
+            x = self.norm(x)
         x = self.proj_first(x)
         
         x1, x2 = torch.chunk(x, 2, dim=1)
@@ -154,7 +153,8 @@ class SGAB_v1(nn.Module):
         shortcut = x.clone()
         # self.norm.train()
         # self.norm.active = True
-        x = self.norm(x)
+        if x.size()[0] > 1:
+            x = self.norm(x)
         x = self.proj_first(x)
         a, x = torch.chunk(x, 2, dim=1)
         x = x * self.DWConv1(a)
@@ -280,7 +280,7 @@ class MAB(nn.Module):
         super().__init__()
         self.enhance = enhance
         
-        self.LKA = TLKA_v3(n_feats)
+        self.LKA = TLKA_v2(n_feats)
         if enhance:
             self.LFE = SGAB_v1(n_feats)
 
