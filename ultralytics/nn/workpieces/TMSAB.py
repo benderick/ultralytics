@@ -96,13 +96,13 @@ class TLKA_v3(nn.Module):
 
         self.LKA3 = nn.Sequential(
             TiedBlockConv2d(split1, split1, 3, 1, 1, groups= split1),  
-            nn.Conv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
+            TiedBlockConv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
             nn.Conv2d(split1, split1, 1, 1, 0),
             )
         
         self.LKA5 = nn.Sequential(
             TiedBlockConv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
-            nn.Conv2d(split2, split2, 7, 1, padding=(7 // 2)*2, groups=split2, dilation=2),
+            TiedBlockConv2d(split2, split2, 7, 1, padding=(7 // 2)*2, groups=split2, dilation=2),
             nn.Conv2d(split2, split2, 1, 1, 0),
             )
         
@@ -280,7 +280,7 @@ class MAB(nn.Module):
         super().__init__()
         self.enhance = enhance
         
-        self.LKA = TLKA_v2(n_feats)
+        self.LKA = TLKA_v3(n_feats)
         if enhance:
             self.LFE = SGAB_v1(n_feats)
 
