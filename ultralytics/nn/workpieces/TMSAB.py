@@ -97,20 +97,20 @@ class TLKA_v3(nn.Module):
         self.LKA3 = nn.Sequential(
             TiedBlockConv2d(split1, split1, 3, 1, 1, groups= split1),  
             TiedBlockConv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
-            nn.Conv2d(split1, split1, 1, 1, 0),
+            TiedBlockConv2d(split1, split1, 1, 1, 0),
             )
         
         self.LKA5 = nn.Sequential(
             TiedBlockConv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
             TiedBlockConv2d(split2, split2, 7, 1, padding=(7 // 2)*2, groups=split2, dilation=2),
-            nn.Conv2d(split2, split2, 1, 1, 0),
+            TiedBlockConv2d(split2, split2, 1, 1, 0),
             )
         
         self.proj_first = nn.Sequential(
-            nn.Conv2d(n_feats, n_feats*2, 1, 1, 0))
+            TiedBlockConv2d(n_feats, n_feats*2, 1, 1, 0))
 
         self.proj_last = nn.Sequential(
-            nn.Conv2d(n_feats*2, n_feats, 1, 1, 0))
+            TiedBlockConv2d(n_feats*2, n_feats, 1, 1, 0))
 
     def forward(self, x):
         shortcut = x.clone()
@@ -136,25 +136,25 @@ class SGAB_v1(nn.Module):
         super().__init__()
         
         i_feats = n_feats * 2
-        # self.norm = LayerNorm(n_feats, data_format="channels_first")
+        self.norm = LayerNorm(n_feats, data_format="channels_first")
         # self.norm = CrossNorm(crop='style', beta=1)
-        self.norm = SelfNorm(chan_num=n_feats, is_two=True)
+        # self.norm = SelfNorm(chan_num=n_feats, is_two=True)
         
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
         
-        self.proj_first = nn.Conv2d(n_feats, i_feats, 1, 1, 0)
+        self.proj_first = TiedBlockConv2d(n_feats, i_feats, 1, 1, 0)
         
-        self.DWConv1 = nn.Conv2d(n_feats, n_feats, 5, 1, 5 // 2, groups=n_feats)
+        self.DWConv1 = TiedBlockConv2d(n_feats, n_feats, 5, 1, 5 // 2, groups=n_feats)
 
-        self.proj_last = nn.Conv2d(n_feats, n_feats, 1, 1, 0)
+        self.proj_last = TiedBlockConv2d(n_feats, n_feats, 1, 1, 0)
             
 
     def forward(self, x):
         shortcut = x.clone()
         # self.norm.train()
         # self.norm.active = True
-        if x.size()[0] > 1:
-            x = self.norm(x)
+        # if x.size()[0] > 1:
+        x = self.norm(x)
         x = self.proj_first(x)
         a, x = torch.chunk(x, 2, dim=1)
         x = x * self.DWConv1(a)
