@@ -97,16 +97,14 @@ class TLKA_v3(nn.Module):
         split2 = n_feats
 
         self.LKA3 = nn.Sequential(
-            Partial_conv3(split1, 2, 'split_cat'),
-            # TiedBlockConv2d(split1, split1, 3, 1, 1, groups= split1),  
-            nn.Conv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
+            Partial_conv3(split1, 3, 1, 1),
+            Partial_conv3(split1, 5, s=1, p=(5//2)*2, d=2),
             nn.Conv2d(split1, split1, 1, 1, 0),
             )
         
         self.LKA5 = nn.Sequential(
-            Partial_conv3(split2, 2, 'split_cat'),
-            # TiedBlockConv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
-            nn.Conv2d(split2, split2, 7, 1, padding=(7 // 2)*2, groups=split2, dilation=2),
+            Partial_conv3(split2, 5, 1, 2),
+            Partial_conv3(split1, 7, s=1, p=(7//2)*2, d=2),
             nn.Conv2d(split2, split2, 1, 1, 0),
             )
         
@@ -155,8 +153,7 @@ class SGAB_v1(nn.Module):
 
     def forward(self, x):
         shortcut = x.clone()
-        # self.norm.train()
-        self.norm.active = True
+        # self.norm.active = True
         # if x.size()[0] > 1:
         x = self.norm(x)
         x = self.proj_first(x)

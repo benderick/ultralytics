@@ -2,14 +2,14 @@ from torch import nn
 import torch
 
 class Partial_conv3(nn.Module):
-    def __init__(self, dim, n_div, forward):
+    def __init__(self, dim, k=3, s=1, p=1, d=1, n_div=2, forward='split_cat'):
         super().__init__()
         # 计算被部分卷积处理的通道数
         self.dim_conv3 = dim // n_div
         # 计算未被处理的通道数
         self.dim_untouched = dim - self.dim_conv3
         # 定义部分卷积层，卷积核大小为3，步幅为1，填充为1
-        self.partial_conv3 = nn.Conv2d(self.dim_conv3, self.dim_conv3, 3, 1, 1, bias=False)
+        self.partial_conv3 = nn.Conv2d(self.dim_conv3, self.dim_conv3, kernel_size=k, stride=s, padding=p, dilation=d, bias=False)
 
         # 根据选择的前向传播方式定义前向传播方法
         if forward == 'slicing':
