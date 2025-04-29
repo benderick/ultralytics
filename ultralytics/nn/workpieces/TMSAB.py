@@ -10,7 +10,7 @@ from ultralytics.nn.workpieces.Norm import CrossNorm, SelfNorm
 from ultralytics.nn.workpieces.PConv import Partial_conv3
 from ultralytics.nn.workpieces.Tied import TiedBlockConv2d
 
-__all__ = ["TMSAB"]
+__all__ = ["TMSAB", "TMSAB_v1"]
 class LayerNorm(nn.Module):
     r""" LayerNorm that supports two data formats: channels_last (default) or channels_first.
     The ordering of the dimensions in the inputs. channels_last corresponds to inputs with
@@ -89,38 +89,33 @@ class TLKA_v3(nn.Module):
     def __init__(self, n_feats):
         super().__init__()
         
-        self.norm = LayerNorm(n_feats, data_format="channels_first")
-        # self.norm = CrossNorm(crop='style', beta=1)
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
 
-        split1 = n_feats
-        split2 = n_feats
+        split1 = n_feats // 2
+        split2 = n_feats // 2
 
         self.LKA3 = nn.Sequential(
             Partial_conv3(split1, 3, 1, 1),
             Partial_conv3(split1, 5, s=1, p=(5//2)*2, d=2),
-            nn.Conv2d(split1, split1, 1, 1, 0),
+            Conv(split1, split1, 1, 1, 0, act=nn.Sigmoid()),
             )
         
         self.LKA5 = nn.Sequential(
             Partial_conv3(split2, 5, 1, 2),
             Partial_conv3(split1, 7, s=1, p=(7//2)*2, d=2),
-            nn.Conv2d(split2, split2, 1, 1, 0),
+            Conv(split2, split2, 1, 1, 0, act=nn.Sigmoid()),
             )
         
-        self.proj_first = nn.Sequential(
-            nn.Conv2d(n_feats, n_feats*2, 1, 1, 0))
+        # self.proj_first = nn.Sequential(
+        #     Conv(n_feats, n_feats*2, 1, 1, 0))
 
         self.proj_last = nn.Sequential(
-            nn.Conv2d(n_feats*2, n_feats, 1, 1, 0))
+            Conv(n_feats, n_feats, 1, 1, 0))
 
     def forward(self, x):
         shortcut = x.clone()
-        # self.norm.train()
-        # self.norm.active = True
-        
-        x = self.norm(x)
-        x = self.proj_first(x)
+                
+        # x = self.proj_first(x)
         
         x1, x2 = torch.chunk(x, 2, dim=1)
         x1 = self.LKA3(x1) 
@@ -138,24 +133,22 @@ class SGAB_v1(nn.Module):
         super().__init__()
         
         i_feats = n_feats * 2
-        self.norm = LayerNorm(n_feats, data_format="channels_first")
+        # self.norm = LayerNorm(n_feats, data_format="channels_first")
         # self.norm = CrossNorm(crop='style', beta=1)
         # self.norm = SelfNorm(chan_num=n_feats, is_two=True)
         
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
         
-        self.proj_first = nn.Conv2d(n_feats, i_feats, 1, 1, 0)
-        
+        self.proj_first = Conv(n_feats, i_feats, 1, 1, 0)
         self.DWConv1 = nn.Conv2d(n_feats, n_feats, 5, 1, 5 // 2, groups=n_feats)
-
-        self.proj_last = nn.Conv2d(n_feats, n_feats, 1, 1, 0)
+        self.proj_last = Conv(n_feats, n_feats, 1, 1, 0)
             
 
     def forward(self, x):
         shortcut = x.clone()
         # self.norm.active = True
         # if x.size()[0] > 1:
-        x = self.norm(x)
+        # x = self.norm(x)
         x = self.proj_first(x)
         a, x = torch.chunk(x, 2, dim=1)
         x = x * self.DWConv1(a)
@@ -289,7 +282,22 @@ class TMSAB(C2f):
         self.m = nn.ModuleList(
             MAB(self.c, enhance) for _ in range(n)
         )
-        
+
+class TMSAB_v1(nn.Module):
+    def __init__(self, c1, c2, enhance=True, e=0.5):
+        super().__init__()
+        hidc = int(c1 * e)
+        self.proj_first = Conv(c1, hidc*3, 1, 1)
+        self.proj_last  = Conv(hidc*4, c2, 1, 1)
+        self.m = MAB(hidc*2, enhance)
+    def forward(self, x):
+        x1, x2, x3 = self.proj_first(x).chunk(3, 1)
+        t1 = torch.cat((x1, x2), 1)
+        t2 = torch.cat((x2, x3), 1)
+        t2 = self.m(t2)
+        x = torch.cat((t1, t2), 1)
+        return self.proj_last(x)
+
 if __name__ == "__main__":
     # Generating Sample image
     image_size = (1, 32, 224, 224)
