@@ -5,7 +5,9 @@ import torch.nn.functional as F
 
 from ultralytics.nn.modules.block import C2f
 from ultralytics.nn.modules.conv import Conv
+from ultralytics.nn.workpieces.Coord import CoordGate
 from ultralytics.nn.workpieces.Norm import CrossNorm, SelfNorm
+from ultralytics.nn.workpieces.PConv import Partial_conv3
 from ultralytics.nn.workpieces.Tied import TiedBlockConv2d
 
 __all__ = ["TMSAB"]
@@ -95,22 +97,24 @@ class TLKA_v3(nn.Module):
         split2 = n_feats
 
         self.LKA3 = nn.Sequential(
-            TiedBlockConv2d(split1, split1, 3, 1, 1, groups= split1),  
-            TiedBlockConv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
-            TiedBlockConv2d(split1, split1, 1, 1, 0),
+            Partial_conv3(split1, 2, 'split_cat'),
+            # TiedBlockConv2d(split1, split1, 3, 1, 1, groups= split1),  
+            nn.Conv2d(split1, split1, 5, stride=1, padding=(5//2)*2, groups=split1, dilation=2),
+            nn.Conv2d(split1, split1, 1, 1, 0),
             )
         
         self.LKA5 = nn.Sequential(
-            TiedBlockConv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
-            TiedBlockConv2d(split2, split2, 7, 1, padding=(7 // 2)*2, groups=split2, dilation=2),
-            TiedBlockConv2d(split2, split2, 1, 1, 0),
+            Partial_conv3(split2, 2, 'split_cat'),
+            # TiedBlockConv2d(split2, split2, 5, 1, padding=5 // 2, groups=split2),
+            nn.Conv2d(split2, split2, 7, 1, padding=(7 // 2)*2, groups=split2, dilation=2),
+            nn.Conv2d(split2, split2, 1, 1, 0),
             )
         
         self.proj_first = nn.Sequential(
-            TiedBlockConv2d(n_feats, n_feats*2, 1, 1, 0))
+            nn.Conv2d(n_feats, n_feats*2, 1, 1, 0))
 
         self.proj_last = nn.Sequential(
-            TiedBlockConv2d(n_feats*2, n_feats, 1, 1, 0))
+            nn.Conv2d(n_feats*2, n_feats, 1, 1, 0))
 
     def forward(self, x):
         shortcut = x.clone()
@@ -142,17 +146,17 @@ class SGAB_v1(nn.Module):
         
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
         
-        self.proj_first = TiedBlockConv2d(n_feats, i_feats, 1, 1, 0)
+        self.proj_first = nn.Conv2d(n_feats, i_feats, 1, 1, 0)
         
-        self.DWConv1 = TiedBlockConv2d(n_feats, n_feats, 5, 1, 5 // 2, groups=n_feats)
+        self.DWConv1 = nn.Conv2d(n_feats, n_feats, 5, 1, 5 // 2, groups=n_feats)
 
-        self.proj_last = TiedBlockConv2d(n_feats, n_feats, 1, 1, 0)
+        self.proj_last = nn.Conv2d(n_feats, n_feats, 1, 1, 0)
             
 
     def forward(self, x):
         shortcut = x.clone()
         # self.norm.train()
-        # self.norm.active = True
+        self.norm.active = True
         # if x.size()[0] > 1:
         x = self.norm(x)
         x = self.proj_first(x)
@@ -199,43 +203,17 @@ class SGAB_v2(nn.Module):
 class SGAB_v3(nn.Module):
     def __init__(self, n_feats):
         super().__init__()
-
-        i_feats = n_feats * 2
-
-        self.norm = LayerNorm(n_feats, data_format="channels_first")
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
-
-        self.proj_first = nn.Conv2d(n_feats, i_feats, 1, 1, 0)
-
-        self.DWConv1 = nn.Sequential(
-            nn.Conv2d(n_feats, n_feats, 5, 1, 5 // 2, groups=n_feats)
-        )
-
-        self.attention = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Conv2d(n_feats, n_feats // 4, 1, 1, 0),
-            nn.GELU(),
-            nn.Conv2d(n_feats // 4, n_feats, 1, 1, 0),
-            nn.Sigmoid(),
-            nn.AdaptiveMaxPool2d(1)
-        )
-
-        self.proj_last = nn.Conv2d(n_feats, n_feats, 1, 1, 0)
+        encoding_layers = 2
+        initialiser = torch.rand((n_feats, 2))
+        kwargs = {'encoding_layers': encoding_layers, 'initialiser': initialiser}
+        self.block = CoordGate(n_feats, n_feats, enctype = 'pos', **kwargs)
 
     def forward(self, x):
         shortcut = x.clone()
 
-        x = self.norm(x)
-
-        x = self.proj_first(x)
-        a, b = torch.chunk(x, 2, dim=1)
-
-        a = self.DWConv1(a)  # 加强后的局部建模
-        att = self.attention(a)
-
-        x = b * (a * att)    # 引入局部注意力调制
-
-        x = self.proj_last(x)
+        # x = self.norm(x)
+        x = self.block(x)
 
         return x * self.scale + shortcut
 

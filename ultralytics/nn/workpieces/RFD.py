@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from ultralytics.nn.workpieces.Harr import Down_wt
 from ultralytics.nn.workpieces.WTConv import WTConv2d
 
 __all__ = ['DRFD']
@@ -38,7 +39,8 @@ class DRFD(nn.Module):
         self.max_m = nn.MaxPool2d(kernel_size=2, stride=2)
         self.batch_norm_m = nn.BatchNorm2d(out_channels)
         
-        self.wtc = WTConv2d(out_channels, out_channels, 5, 2)
+        # self.wtc = WTConv2d(out_channels, out_channels, 5, 2)
+        self.harr = Down_wt(out_channels, out_channels)
         
         self.fusion = nn.Conv2d(3 * out_channels, out_channels, kernel_size=1, stride=1)
 
@@ -60,12 +62,14 @@ class DRFD(nn.Module):
         m = self.max_m(m)       # m = [B, 2C, H/2, W/2]
         m = self.batch_norm_m(m)
         
-        w = self.wtc(w)           # w = [B, 2C, H/2, W/2]
-        w = self.act_x(w)
-        w = self.batch_norm_x(w)
+        # w = self.wtc(w)           # w = [B, 2C, H/2, W/2]
+        # w = self.act_x(w)
+        # w = self.batch_norm_x(w)
+        w = self.harr(w)
+
         
         # Concat + conv
-        x = torch.cat([c, x, m], dim=1)  # x = [B, 6C, H/2, W/2]
+        x = torch.cat([c, x, w], dim=1)  # x = [B, 6C, H/2, W/2]
         x = self.fusion(x)      # x = [B, 6C, H/2, W/2] --> [B, 2C, H/2, W/2]
 
         return x                # x = [B, 2C, H/2, W/2]
