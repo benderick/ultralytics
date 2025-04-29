@@ -133,9 +133,6 @@ class SGAB_v1(nn.Module):
         super().__init__()
         
         i_feats = n_feats * 2
-        # self.norm = LayerNorm(n_feats, data_format="channels_first")
-        # self.norm = CrossNorm(crop='style', beta=1)
-        # self.norm = SelfNorm(chan_num=n_feats, is_two=True)
         
         self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
         
@@ -146,9 +143,6 @@ class SGAB_v1(nn.Module):
 
     def forward(self, x):
         shortcut = x.clone()
-        # self.norm.active = True
-        # if x.size()[0] > 1:
-        # x = self.norm(x)
         x = self.proj_first(x)
         a, x = torch.chunk(x, 2, dim=1)
         x = x * self.DWConv1(a)
@@ -265,8 +259,8 @@ class MAB_v1(nn.Module):
         super().__init__()
         self.enhance = enhance
         if enhance:
-            self.LKA = TLKA_v2(n_feats)
-        self.LFE = SGAB_v3(n_feats)
+            self.LKA = TLKA_v3(n_feats)
+        self.LFE = SGAB_v1(n_feats)
 
     def forward(self, x):
         x = self.LKA(x) if self.enhance else x
@@ -289,13 +283,17 @@ class TMSAB_v1(nn.Module):
         hidc = int(c1 * e)
         self.proj_first = Conv(c1, hidc*3, 1, 1)
         self.proj_last  = Conv(hidc*4, c2, 1, 1)
-        self.m = MAB(hidc*2, enhance)
+        self.m1 = nn.Sequential(
+            nn.Conv2d(hidc, hidc, 7, 1, 7 // 2, groups=hidc),
+            nn.Sigmoid()
+        )
+        self.m2 = MAB_v1(hidc*2, enhance)
     def forward(self, x):
         x1, x2, x3 = self.proj_first(x).chunk(3, 1)
-        t1 = torch.cat((x1, x2), 1)
-        t2 = torch.cat((x2, x3), 1)
-        t2 = self.m(t2)
-        x = torch.cat((t1, t2), 1)
+        x1 = x1
+        x2 = self.m1(x1) * x2
+        x3 = self.m2(torch.cat((x2, x3), 1))
+        x = torch.cat((x1, x2, x3), 1)
         return self.proj_last(x)
 
 if __name__ == "__main__":
