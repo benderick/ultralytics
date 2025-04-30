@@ -97,26 +97,21 @@ class TLKA_v3(nn.Module):
         self.LKA3 = nn.Sequential(
             Partial_conv3(split1, 3, 1, 1),
             Partial_conv3(split1, 5, s=1, p=(5//2)*2, d=2),
-            Conv(split1, split1, 1, 1, 0, act=nn.Sigmoid()),
+            Conv(split1, split1, 1, 1, 0, act=False),
             )
         
         self.LKA5 = nn.Sequential(
             Partial_conv3(split2, 5, 1, 2),
             Partial_conv3(split1, 7, s=1, p=(7//2)*2, d=2),
-            Conv(split2, split2, 1, 1, 0, act=nn.Sigmoid()),
+            Conv(split2, split2, 1, 1, 0, act=False),
             )
-        
-        # self.proj_first = nn.Sequential(
-        #     Conv(n_feats, n_feats*2, 1, 1, 0))
 
         self.proj_last = nn.Sequential(
             Conv(n_feats, n_feats, 1, 1, 0))
 
     def forward(self, x):
         shortcut = x.clone()
-                
-        # x = self.proj_first(x)
-        
+                     
         x1, x2 = torch.chunk(x, 2, dim=1)
         x1 = self.LKA3(x1) 
         x2 = self.LKA5(x2)
@@ -282,18 +277,15 @@ class TMSAB_v1(nn.Module):
         super().__init__()
         hidc = int(c1 * e)
         self.proj_first = Conv(c1, hidc*3, 1, 1)
-        self.proj_last  = Conv(hidc*4, c2, 1, 1)
-        self.m1 = nn.Sequential(
-            nn.Conv2d(hidc, hidc, 7, 1, 7 // 2, groups=hidc),
-            nn.Sigmoid()
-        )
+        self.proj_last  = Conv(hidc*5, c2, 1, 1)
+        self.m1 = MAB_v1(hidc*2, False)
         self.m2 = MAB_v1(hidc*2, enhance)
     def forward(self, x):
         x1, x2, x3 = self.proj_first(x).chunk(3, 1)
-        x1 = x1
-        x2 = self.m1(x1) * x2
-        x3 = self.m2(torch.cat((x2, x3), 1))
-        x = torch.cat((x1, x2, x3), 1)
+        t1 = x1
+        t2 = self.m1(torch.cat((x1,x2), 1))
+        t3 = self.m2(torch.cat((x2,x3), 1))
+        x = torch.cat((t1, t2, t3), 1)
         return self.proj_last(x)
 
 if __name__ == "__main__":

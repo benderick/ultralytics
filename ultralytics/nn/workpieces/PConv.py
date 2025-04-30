@@ -31,10 +31,11 @@ class Partial_conv3(nn.Module):
         # 用于训练/推断阶段
         # 将输入张量拆分为两部分
         x1, x2 = torch.split(x, [self.dim_conv3, self.dim_untouched], dim=1)
+        x2_1, x2_2 = torch.chunk(x2, 2, dim=1)
         # 处理部分卷积的通道
         x1 = self.partial_conv3(x1)
         # 将处理后的部分与未处理的部分拼接在一起
-        x = torch.cat((x1, x2), 1)
+        x = torch.cat((x2_1, x1, x2_2), 1)
 
         return x  # 返回拼接后的特征图
 
