@@ -7,6 +7,7 @@ from ultralytics.nn.modules.block import C2f
 from ultralytics.nn.modules.conv import Conv
 from ultralytics.nn.workpieces.MBFD import PTConv
 
+
 __all__ = ["TMSAB", "TMSAB_v1"]
 class LayerNorm(nn.Module):
     r""" LayerNorm that supports two data formats: channels_last (default) or channels_first.
@@ -81,27 +82,42 @@ class TLKA_v2(nn.Module):
 class TLKA_v3(nn.Module):
     def __init__(self, n_feats):
         super().__init__()
+        
+        self.scale = nn.Parameter(torch.zeros((1, n_feats, 1, 1)), requires_grad=True)
+
         split1 = n_feats//2
         split2 = n_feats//2
+
         self.LKA3 = nn.Sequential(
             PTConv(split1, 3, 1, 1, n_div=2, nwa=False),
             PTConv(split1, 5, s=1, p=(5//2)*2, d=2, n_div=2, nwa=False),
             Conv(split1, split1, 1, 1, 0, act=False),
             )
+        
         self.LKA5 = nn.Sequential(
             PTConv(split2, 5, 1, 2, n_div=2, nwa=False),
             PTConv(split2, 7, s=1, p=(7//2)*2, d=2, n_div=2, nwa=False),
             Conv(split2, split2, 1, 1, 0, act=False),
             )
+        
+        # self.proj_first = nn.Sequential(
+            # Conv(n_feats, n_feats*2, 1, 1, 0))
         self.proj_last = nn.Sequential(
             Conv(n_feats, n_feats, 1, 1, 0))
 
     def forward(self, x):
+        shortcut = x.clone()
+        
         x1, x2 = torch.chunk(x, 2, dim=1)
         x1 = self.LKA3(x1) 
         x2 = self.LKA5(x2)
-        x = self.proj_last(torch.cat((x1, x2), dim=1))
-        return x # x * self.scale + shortcut
+        
+        t1 = (x1 + x2) * x[:, 0::2, :, :]
+        t2 = (x1 * x2) + x[:, 1::2, :, :]
+        
+        x = self.proj_last(torch.cat((t1, t2), dim=1))
+
+        return x * self.scale + shortcut
     
 class SGAB_v1(nn.Module):
     def __init__(self, n_feats):
@@ -187,7 +203,7 @@ if __name__ == "__main__":
     image = torch.rand(*image_size)
 
     # Model
-    model = MAB(32)
+    model = MAB_v1(32)
 
     out = model(image)
     print(out.size())
