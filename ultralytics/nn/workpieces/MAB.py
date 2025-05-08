@@ -10,7 +10,7 @@ from .FreqSpatial import FreqSpatial
 from ultralytics.nn.modules.block import C3k, C2f
 from ultralytics.nn.modules.conv import Conv
 
-__all__ = ["C3k2_MAB1", "C3k2_SmallMAB", "C3k2_EnhancedMAB", "C3k2_FreqEnhancedMAB"]
+__all__ = ["C3k2_MAB", "C3k2_SmallMAB", "C3k2_EnhancedMAB", "C3k2_FreqEnhancedMAB"]
 
 # LKA from VAN (https://github.com/Visual-Attention-Network)
 
@@ -141,14 +141,14 @@ class MAB(nn.Module):
         return x
 
 
-class C3k2_MAB1(C2f):
+class C3k2_MAB(C2f):
     """Faster Implementation of CSP Bottleneck with 2 convolutions."""
 
     def __init__(self, c1, c2, n=1, c3k=False, e=0.5, g=1, shortcut=True):
         """Initializes the C3k2 module, a faster CSP Bottleneck with 2 convolutions and optional C3k blocks."""
         super().__init__(c1, c2, n, shortcut, g, e)
         self.m = nn.ModuleList(
-            C3k(self.c, self.c, 2, shortcut, g) if c3k else MAB(self.c) for _ in range(n)
+            C3k(self.c, self.c, 2, shortcut, g) if not c3k else MAB(self.c) for _ in range(n)
         )
 
 

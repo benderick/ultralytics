@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from pytorch_wavelets import DWTForward
-__all__ = ['DRFD_v1']
+__all__ = ['MBFD', 'FMBFD']
 
 class TiedBlockConv2d(nn.Module):
     '''Tied Block Conv2d'''
@@ -34,26 +34,18 @@ class TiedBlockConv2d(nn.Module):
 class Down_wt(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(Down_wt, self).__init__()
-        # 初始化离散小波变换，J=1表示变换的层数，mode='zero'表示填充模式，使用'Haar'小波
         self.wt = DWTForward(J=1, mode='zero', wave='haar')
-        # 定义卷积、批归一化和ReLU激活的顺序组合
         self.conv_bn_relu = nn.Sequential(
-            nn.Conv2d(in_ch * 4, out_ch, kernel_size=1, stride=1),  # 1x1卷积层，通道数由in_ch*4变为out_ch
-            # nn.BatchNorm2d(out_ch),  # 批归一化层
-            # nn.ReLU(inplace=True),  # ReLU激活函数
-            # nn.SiLU()
+            nn.Conv2d(in_ch * 4, out_ch, kernel_size=1, stride=1),
+            nn.BatchNorm2d(out_ch),  
+            nn.ReLU(inplace=True), 
         )
-
     def forward(self, x):
-        # 对输入x进行离散小波变换，得到低频部分yL和高频部分yH
         yL, yH = self.wt(x)
-        # 提取高频部分的不同分量
-        y_HL = yH[0][:, :, 0, ::]  # 水平高频
-        y_LH = yH[0][:, :, 1, ::]  # 垂直高频
-        y_HH = yH[0][:, :, 2, ::]  # 对角高频
-        # 将低频部分和高频部分拼接在一起
+        y_HL = yH[0][:, :, 0, :]  # 水平高频
+        y_LH = yH[0][:, :, 1, :]  # 垂直高频
+        y_HH = yH[0][:, :, 2, :]  # 对角高频
         x = torch.cat([yL, y_HL, y_LH, y_HH], dim=1)
-        # 通过卷积、批归一化和ReLU激活处理拼接后的特征
         x = self.conv_bn_relu(x)
         return x
 
@@ -86,16 +78,16 @@ class Conv(nn.Module):
         return self.act(self.conv(x))
 
 class PTConv(nn.Module):
-    def __init__(self, dim, k=3, s=1, p=1, d=1, n_div=2):
+    def __init__(self, dim, k=3, s=1, p=1, d=1, n_div=2, nwa=True):
         super().__init__()
         self.dim_conv3 = dim // n_div
         self.dim_untouched = dim - self.dim_conv3
         self.partial_conv3 = nn.Conv2d(self.dim_conv3, self.dim_conv3, kernel_size=k, stride=s, padding=p, dilation=d, bias=False)
         self.tied_conv = TiedBlockConv2d(self.dim_untouched, self.dim_untouched, kernel_size=k, stride=s, padding=p, dilation=d, bias=False)
-        self.norm = nn.BatchNorm2d(dim)
-        # self.act = nn.GELU()
-        # self.act = nn.ReLU(inplace=True)
-        self.act = nn.SiLU()
+        self.nwa = nwa
+        if nwa:
+            self.norm = nn.BatchNorm2d(dim)
+            self.act = nn.SiLU()
         
     def forward(self, x):
         x1, x2 = torch.split(x, [self.dim_conv3, self.dim_untouched], dim=1)
@@ -103,17 +95,67 @@ class PTConv(nn.Module):
         x2 = self.tied_conv(x2)
         x2_1, x2_2 = torch.chunk(x2, 2, dim=1)
         x = torch.cat((x2_1, x1, x2_2), 1)
-        # x = self.act(self.norm(x))
+        if self.nwa:
+            x = self.act(self.norm(x))
         return x
 
-class DRFD_v1(nn.Module):
-    def __init__(self, in_channels=3, out_channels=64):
+class SPDConv(nn.Module):
+    # Changing the dimension of the Tensor
+    def __init__(self, inc, ouc):
         super().__init__()
-        self.proj_first = Conv(in_channels, out_channels, k=3, s=1, p=1, g=(1 if in_channels == 3 else in_channels))
+        self.conv = Conv(inc * 4, ouc, act=nn.ReLU(inplace=True), k=3, s=1, p=1)
+
+    def forward(self, x):
+        x = torch.cat([x[...,  ::2,  ::2], 
+                       x[..., 1::2,  ::2], 
+                       x[...,  ::2, 1::2], 
+                       x[..., 1::2, 1::2]
+                      ], 1)
+        x = self.conv(x)
+        return x
+
+class FMBFD(nn.Module):
+    """
+    首层多分支融合下采样模块（First-layer Multi-branch Fusion Downsampling, FMBFD）
+    用于首层（从三通道出发）的下采样
+    """
+    def __init__(self, in_channels=3, out_channels=16):
+        super().__init__()
+        self.proj_first = Conv(in_channels, out_channels//2, k=3, s=1, p=1)
         
-        # self.conv1 = Conv(out_channels, out_channels//2, k=3, s=2, p=1, g=out_channels//2, act=nn.SiLU())
+        self.conv1 = SPDConv(in_channels, out_channels//2)
         
-        self.conv1 = nn.Conv2d(out_channels, out_channels//2, 3, 2, 1, groups=out_channels//2)
+        self.conv2 = Conv(out_channels//2, out_channels//2, k=3, s=2, p=1, g=out_channels//2)
+        
+        self.conv3 = PTConv(out_channels//2, k=3, s=2, p=1, d=1, n_div=2)
+        
+        self.conv4 = Down_wt(in_channels, out_channels//2)
+        
+        self.proj_last = Conv(2*out_channels, out_channels)
+
+    def forward(self, x):
+        c = self.proj_first(x)
+
+        c1 = self.conv1(x)     
+        c2 = self.conv2(c)
+        c3 = self.conv3(c)
+        c4 = self.conv4(x)
+
+        x = torch.cat([c1, c2, c3, c4], dim=1)
+        x = self.proj_last(x)
+        return x
+
+class MBFD(nn.Module):
+    """
+    多分支融合下采样模块（Multi-branch Fusion Downsampling, MBFD）
+    该模块融合了深度可分离卷积、部分通道卷积和小波变换三种不同的下采样方式，
+    通过通道拼接和1x1卷积实现高效特征融合，提升下采样阶段的特征表达能力。
+    """
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.proj_first = Conv(in_channels, out_channels, k=3, s=1, p=1, g=in_channels)
+        
+        self.conv1 = Conv(out_channels, out_channels//2, k=3, s=2, p=1, g=out_channels//2)
         
         self.conv2 = PTConv(out_channels, k=3, s=2, p=1, d=1, n_div=2)
         
@@ -135,12 +177,12 @@ class DRFD_v1(nn.Module):
 if __name__ == "__main__":
     # Example usage
     batch_size = 1
-    channels = 16
+    channels = 3
     height = 256
     width = 256
 
     input_tensor = torch.randn(batch_size, channels, height, width)
-    model = DRFD_v1(in_channels=channels, out_channels=32)
+    model = FMBFD(in_channels=channels, out_channels=32)
     output_tensor = model(input_tensor)
 
     print("Input shape:", input_tensor.shape)
