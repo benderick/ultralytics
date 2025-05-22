@@ -153,7 +153,7 @@ class MBFD(nn.Module):
     """
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.proj_first = Conv(in_channels, out_channels, k=3, s=1, p=1, g=in_channels)
+        self.proj_first = Conv(in_channels, out_channels, k=1, s=1)
         
         self.conv1 = Conv(out_channels, out_channels//2, k=3, s=2, p=1, g=out_channels//2)
         
