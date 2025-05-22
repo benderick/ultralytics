@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 from pytorch_wavelets import DWTForward
@@ -77,7 +78,7 @@ class Conv(nn.Module):
         """Apply convolution and activation without batch normalization."""
         return self.act(self.conv(x))
 
-class PTConv(nn.Module):
+class PTConv_v1(nn.Module):
     def __init__(self, dim, k=3, s=1, p=1, d=1, n_div=2, nwa=True):
         super().__init__()
         self.dim_conv3 = dim // n_div
@@ -92,6 +93,28 @@ class PTConv(nn.Module):
     def forward(self, x):
         x1, x2 = torch.split(x, [self.dim_conv3, self.dim_untouched], dim=1)
         x1 = self.partial_conv3(x1)
+        x2 = self.tied_conv(x2)
+        x2_1, x2_2 = torch.chunk(x2, 2, dim=1)
+        x = torch.cat((x2_1, x1, x2_2), 1)
+        if self.nwa:
+            x = self.act(self.norm(x))
+        return x
+    
+class PTConv(nn.Module):
+    def __init__(self, dim, k=3, s=2, p=1, d=1, nwa=True, n_div=2):
+        super().__init__()
+        assert dim % 2 == 0, "dim must be even"
+        self.dim = dim // 2
+        self.dw_conv = nn.Conv2d(self.dim, self.dim, kernel_size=7, stride=s, padding=3, dilation=d, groups=self.dim, bias=False)
+        self.tied_conv = TiedBlockConv2d(self.dim, self.dim, kernel_size=k, stride=s, padding=p, dilation=d, bias=False, B=2)
+        self.nwa = nwa
+        if nwa:
+            self.norm = nn.BatchNorm2d(dim)
+            self.act = nn.SiLU()
+        
+    def forward(self, x):
+        x1, x2 = torch.chunk(x, 2, dim=1)
+        x1 = self.dw_conv(x1)
         x2 = self.tied_conv(x2)
         x2_1, x2_2 = torch.chunk(x2, 2, dim=1)
         x = torch.cat((x2_1, x1, x2_2), 1)
@@ -131,7 +154,7 @@ class FMBFD(nn.Module):
         
         self.conv4 = Down_wt(in_channels, out_channels//2)
         
-        self.proj_last = Conv(2*out_channels, out_channels)
+        self.proj_last = Conv(int(2*out_channels), out_channels)
 
     def forward(self, x):
         c = self.proj_first(x)
@@ -153,24 +176,26 @@ class MBFD(nn.Module):
     """
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.proj_first = Conv(in_channels, out_channels, k=1, s=1)
+        self.proj_first = Conv(in_channels, out_channels, k=3, s=1, p=1, g=math.gcd(in_channels, out_channels))
         
-        self.conv1 = Conv(out_channels, out_channels//2, k=3, s=2, p=1, g=out_channels//2)
+        # self.conv1 = Conv(out_channels, out_channels//2, k=3, s=2, p=1, g=out_channels//2)
         
         self.conv2 = PTConv(out_channels, k=3, s=2, p=1, d=1, n_div=2)
         
         self.harr = Down_wt(in_channels, out_channels // 2)
         
-        self.proj_last = Conv(2*out_channels, out_channels, k=1, s=1)
+        self.proj_last = Conv(int(1.5*out_channels), out_channels, k=1, s=1)
 
     def forward(self, x):
         c = self.proj_first(x)
 
-        c1 = self.conv1(c)     
+        # c1 = self.conv1(c)     
         c2 = self.conv2(c)
         w = self.harr(x)
 
-        x = torch.cat([c1, c2, w], dim=1)
+        # x = torch.cat([c1, c2, w], dim=1)
+        x = torch.cat([c2, w], dim=1)
+        
         x = self.proj_last(x)
         return x
 
