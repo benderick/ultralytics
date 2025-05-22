@@ -84,7 +84,7 @@ class PTConv(nn.Module):
         self.dim_conv3 = dim // n_div
         self.dim_untouched = dim - self.dim_conv3
         self.partial_conv3 = nn.Conv2d(self.dim_conv3, self.dim_conv3, kernel_size=k, stride=s, padding=p, dilation=d, bias=False)
-        self.tied_conv = TiedBlockConv2d(self.dim_untouched, self.dim_untouched, kernel_size=k, stride=s, padding=p, dilation=d, bias=False, B=2)
+        self.tied_conv = TiedBlockConv2d(self.dim_untouched, self.dim_untouched, kernel_size=k, stride=s, padding=p, dilation=d, bias=False)
         self.nwa = nwa
         if nwa:
             self.norm = nn.BatchNorm2d(dim)
@@ -133,7 +133,7 @@ class FMBFD(nn.Module):
         
         self.conv4 = Down_wt(in_channels, out_channels//2)
         
-        self.proj_last = Conv(int(2*out_channels), out_channels)
+        self.proj_last = Conv(2*out_channels, out_channels)
 
     def forward(self, x):
         c = self.proj_first(x)
@@ -157,13 +157,13 @@ class MBFD(nn.Module):
         super().__init__()
         self.proj_first = Conv(in_channels, out_channels, k=3, s=1, p=1, g=math.gcd(in_channels, out_channels))
         
-        self.conv1 = Conv(out_channels, out_channels//2, k=7, s=2, p=3, g=out_channels//2)
+        self.conv1 = Conv(out_channels, out_channels//2, k=3, s=2, p=1, g=out_channels//2)
         
         self.conv2 = PTConv(out_channels, k=3, s=2, p=1, d=1, n_div=2)
         
         self.harr = Down_wt(in_channels, out_channels // 2)
         
-        self.proj_last = Conv(int(2*out_channels), out_channels, k=1, s=1)
+        self.proj_last = Conv(2*out_channels, out_channels, k=1, s=1)
 
     def forward(self, x):
         c = self.proj_first(x)
