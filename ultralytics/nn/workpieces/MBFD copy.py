@@ -36,16 +36,16 @@ class Down_wt(nn.Module):
         super(Down_wt, self).__init__()
         self.wt = DWTForward(J=1, mode='zero', wave='haar')
         self.conv_bn_relu = nn.Sequential(
-            nn.Conv2d(in_ch * 2, out_ch, kernel_size=1, stride=1),
+            nn.Conv2d(in_ch * 4, out_ch, kernel_size=1, stride=1),
             nn.BatchNorm2d(out_ch),  
-            nn.SiLU(), 
+            nn.ReLU(inplace=True), 
         )
     def forward(self, x):
         yL, yH = self.wt(x)
         y_HL = yH[0][:, :, 0, :]  # 水平高频
         y_LH = yH[0][:, :, 1, :]  # 垂直高频
         y_HH = yH[0][:, :, 2, :]  # 对角高频
-        x = torch.cat([yL, yL+y_HL+y_LH+y_HH], dim=1)
+        x = torch.cat([yL, y_HL, y_LH, y_HH], dim=1)
         x = self.conv_bn_relu(x)
         return x
 
@@ -93,9 +93,8 @@ class PTConv(nn.Module):
         x1, x2 = torch.split(x, [self.dim_conv3, self.dim_untouched], dim=1)
         x1 = self.partial_conv3(x1)
         x2 = self.tied_conv(x2)
-        x1_1, x1_2 = torch.chunk(x1, 2, dim=1)
         x2_1, x2_2 = torch.chunk(x2, 2, dim=1)
-        x = torch.cat((x1_1, x2_1, x1_2, x2_2), 1)
+        x = torch.cat((x2_1, x1, x2_2), 1)
         if self.nwa:
             x = self.act(self.norm(x))
         return x
