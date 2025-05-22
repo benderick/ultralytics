@@ -93,9 +93,8 @@ class PTConv(nn.Module):
         x1, x2 = torch.split(x, [self.dim_conv3, self.dim_untouched], dim=1)
         x1 = self.partial_conv3(x1)
         x2 = self.tied_conv(x2)
-        x1_1, x1_2 = torch.chunk(x1, 2, dim=1)
         x2_1, x2_2 = torch.chunk(x2, 2, dim=1)
-        x = torch.cat((x2_1, x1_1, x2_2, x1_2), 1)
+        x = torch.cat((x2_1, x1, x2_2), 1)
         if self.nwa:
             x = self.act(self.norm(x))
         return x
