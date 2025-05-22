@@ -168,11 +168,12 @@ class MBFD(nn.Module):
     def forward(self, x):
         c = self.proj_first(x)
 
-        c1 = self.conv1(c)     
+        c1 = self.conv1(c)
+        c1_1, c1_2 = torch.chunk(c1, 2, dim=1)     
         c2 = self.conv2(c)
         w = self.harr(x)
 
-        x = torch.cat([c1, c2, w], dim=1)
+        x = torch.cat([c1_1, c2, w, c1_2], dim=1)
         
         x = self.proj_last(x)
         return x
