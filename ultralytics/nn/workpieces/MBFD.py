@@ -105,12 +105,12 @@ class SPDConv(nn.Module):
     # Changing the dimension of the Tensor
     def __init__(self, inc, ouc):
         super().__init__()
-        self.conv = Conv(inc * 2, ouc, k=3, s=1, p=1, act=nn.SiLU())
+        self.conv = Conv(inc * 4, ouc, k=3, s=1, p=1, act=nn.SiLU())
 
     def forward(self, x):
-        x = torch.cat([x[...,  ::2,  ::2]+
+        x = torch.cat([x[...,  ::2,  ::2],
+                       x[..., 1::2,  ::2], 
                        x[...,  ::2, 1::2],
-                       x[..., 1::2,  ::2]+ 
                        x[..., 1::2, 1::2]
                       ], 1)
         x = self.conv(x)
