@@ -84,7 +84,7 @@ class PTConv(nn.Module):
         self.dim_conv3 = dim // n_div
         self.dim_untouched = dim - self.dim_conv3
         self.partial_conv3 = nn.Conv2d(self.dim_conv3, self.dim_conv3, kernel_size=k, stride=s, padding=p, dilation=d, bias=False)
-        self.tied_conv = TiedBlockConv2d(self.dim_untouched, self.dim_untouched, kernel_size=k, stride=s, padding=p, dilation=d, bias=False)
+        self.tied_conv = TiedBlockConv2d(self.dim_untouched, self.dim_untouched, kernel_size=k, stride=s, padding=p, dilation=d, bias=False, B=2)
         self.nwa = nwa
         if nwa:
             self.norm = nn.BatchNorm2d(dim)
@@ -172,7 +172,7 @@ class MBFD(nn.Module):
         c2 = self.conv2(c)
         w = self.harr(x)
 
-        x = torch.cat([c1, c2, w], dim=1)
+        x = torch.cat([c1, w, c2], dim=1)
         
         x = self.proj_last(x)
         return x
