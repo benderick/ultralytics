@@ -172,7 +172,7 @@ class MBFD(nn.Module):
         c2 = self.conv2(c)
         w = self.harr(x)
 
-        x = torch.cat([c1, w, c2], dim=1)
+        x = torch.cat([c1, c2, w], dim=1)
         
         x = self.proj_last(x)
         return x
