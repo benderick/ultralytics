@@ -105,7 +105,7 @@ class SPDConv(nn.Module):
     # Changing the dimension of the Tensor
     def __init__(self, inc, ouc):
         super().__init__()
-        self.conv = Conv(inc * 4, ouc, k=3, s=1, p=1, act=nn.SiLU())
+        self.conv = Conv(inc * 4, ouc, act=nn.ReLU(inplace=True), k=3, s=1, p=1)
 
     def forward(self, x):
         x = torch.cat([x[...,  ::2,  ::2],
@@ -127,7 +127,7 @@ class FMBFD(nn.Module):
         
         self.conv1 = SPDConv(in_channels, out_channels//2)
         
-        self.conv2 = Conv(out_channels//2, out_channels//2, k=3, s=2, p=1, g=out_channels//2)
+        self.conv2 = Conv(out_channels//2, out_channels//2, k=7, s=2, p=3, g=out_channels//2)
         
         self.conv3 = PTConv(out_channels//2, k=3, s=2, p=1, d=1, n_div=2)
         
