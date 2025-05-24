@@ -44,9 +44,9 @@ class DWTConv(nn.Module):
         )
     def forward(self, x):
         yL, yH = self.wt(x)
-        y_HL = yH[0][:, :, 0, :]  # 水平高频
-        y_LH = yH[0][:, :, 1, :]  # 垂直高频
-        y_HH = yH[0][:, :, 2, :]  # 对角高频
+        y_HL = yH[0][:, :, 0, :]
+        y_LH = yH[0][:, :, 1, :]
+        y_HH = yH[0][:, :, 2, :]
         x = torch.cat([yL, yL+y_HL+y_LH+y_HH], dim=1)
         x = self.conv_bn_relu(x)
         return x
@@ -94,25 +94,18 @@ class FMBFD(nn.Module):
     def __init__(self, in_channels=3, out_channels=16):
         super().__init__()
         self.proj_first = Conv(in_channels, out_channels//2, k=3, s=1, p=1)
-        
         self.conv1 = SPDConv(in_channels, out_channels//2)
-        
         self.conv2 = Conv(out_channels//2, out_channels//2, k=3, s=2, p=1, g=out_channels//2)
-        
         self.conv3 = PTConv(out_channels//2, out_channels//2, k=3, s=2, p=1)
-        
         self.conv4 = DWTConv(in_channels, out_channels//2)
-        
         self.proj_last = Conv(2*out_channels, out_channels)
 
     def forward(self, x):
         c = self.proj_first(x)
-
         c1 = self.conv1(x)     
         c2 = self.conv2(c)
         c3 = self.conv3(c)
         c4 = self.conv4(x)
-
         x = torch.cat([c1, c2, c3, c4], dim=1)
         x = self.proj_last(x)
         return x
@@ -126,24 +119,17 @@ class MBFD(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.proj_first = Conv(in_channels, out_channels, k=3, s=1, p=1, g=math.gcd(in_channels, out_channels))
-        
         self.conv1 = Conv(out_channels, out_channels//2, k=3, s=2, p=1, g=out_channels//2)
-        
         self.conv2 = PTConv(out_channels, out_channels, k=3, s=2, p=1)
-        
         self.harr = DWTConv(in_channels, out_channels // 2)
-        
-        self.proj_last = Conv(2*out_channels, out_channels, k=1, s=1)
+        self.proj_last = Conv(2*out_channels, out_channels)
 
     def forward(self, x):
         c = self.proj_first(x)
-
         c1 = self.conv1(c)     
         c2 = self.conv2(c)
         w = self.harr(x)
-
         x = torch.cat([c1, c2, w], dim=1)
-        
         x = self.proj_last(x)
         return x
 
